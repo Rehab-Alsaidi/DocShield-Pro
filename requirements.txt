@@ -15,6 +15,12 @@ reportlab==4.0.4
 # Railway deployment compatibility
 setuptools==69.0.3
 
+# AI/ML Libraries for Railway
+torch==2.0.1
+torchvision==0.15.2
+transformers==4.33.2
+sentence-transformers==2.2.2
+
 # Utilities
 requests==2.31.0
 python-dateutil==2.8.2
