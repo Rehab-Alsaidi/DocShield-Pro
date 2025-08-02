@@ -1,4 +1,5 @@
 # core/vision_analyzer.py
+import os
 from PIL import Image
 from typing import Dict, List, Tuple
 from dataclasses import dataclass
