@@ -1609,8 +1609,7 @@ if __name__ == '__main__':
     os.makedirs("logs", exist_ok=True)
     os.makedirs("static/uploads", exist_ok=True)
     
-    # Create smart app
-    app = create_enhanced_app()
+    # Use existing app instance
     
     print("✅ Smart DocShield Pro is running!")
     print("🌐 Visit: http://localhost:8080")
