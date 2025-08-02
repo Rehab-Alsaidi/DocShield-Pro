@@ -1,9 +1,10 @@
-# PDF Content Moderator - Lightweight Railway Optimized
+# PDF Content Moderator - Railway Optimized
+
 # Core Web Framework
 Flask==2.3.3
 Werkzeug==2.3.7
 
-# Core Processing Libraries - Railway Compatible
+# Core Processing Libraries
 Pillow==10.0.1
 
 # PDF Processing
@@ -11,15 +12,6 @@ PyMuPDF==1.23.5
 
 # Report Generation
 reportlab==4.0.4
-
-# Railway deployment compatibility
-setuptools==69.0.3
-
-# Lightweight AI/ML Libraries for Railway (Optimized)
---index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1+cpu
-torchvision==0.20.1+cpu
-transformers==4.44.0
 
 # Utilities
 requests==2.31.0
@@ -34,3 +26,8 @@ SQLAlchemy==2.0.21
 
 # Production Server
 gunicorn==21.2.0
+
+# AI/ML Libraries - Railway CPU optimized
+torch==2.5.1+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
+torchvision==0.20.1+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
+transformers==4.44.0
