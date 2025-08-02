@@ -1,2 +1,11 @@
 Flask==3.0.0
+Werkzeug==3.0.1
 gunicorn==22.0.0
+Pillow==10.3.0
+PyMuPDF==1.24.2
+reportlab==4.2.2
+requests==2.32.3
+python-dateutil==2.9.0
+tqdm==4.66.4
+numpy==1.26.4
+psutil==6.0.0
