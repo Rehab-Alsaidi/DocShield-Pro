@@ -477,11 +477,26 @@ def create_enhanced_app():
     os.makedirs('logs', exist_ok=True)
     
     # Initialize database for Railway PostgreSQL (optional)
-    if DATABASE_AVAILABLE and os.getenv("DATABASE_URL"):
+    database_url = os.getenv("DATABASE_URL")
+    if DATABASE_AVAILABLE and database_url:
         try:
-            logger.info("🗄️ Initializing PostgreSQL database...")
-            init_database()
+            logger.info("🗄️ Railway PostgreSQL detected - initializing database...")
+            logger.info(f"🔗 Database URL: {database_url[:50]}...")
+            
+            # Initialize database tables
+            init_database(database_url)
             logger.info("✅ Database initialized successfully")
+            
+            # Test database connection
+            try:
+                with get_db_session() as session:
+                    from sqlalchemy import text
+                    result = session.execute(text("SELECT COUNT(*) FROM documents"))
+                    count = result.scalar()
+                    logger.info(f"📊 Database connected - {count} documents in database")
+            except Exception as test_e:
+                logger.warning(f"⚠️ Database test query failed: {test_e}")
+                
         except Exception as e:
             logger.warning(f"⚠️ Database initialization failed: {e}")
             logger.info("📄 App will continue without database (using file storage)")

@@ -417,11 +417,28 @@ class ViolationDAL:
 # Utility functions
 def init_database(database_url: Optional[str] = None):
     """Initialize database with tables"""
-    db = DatabaseManager(database_url)
-    db.connect()
-    db.create_tables()
-    db.close_connection()
-    logger.info("Database initialized successfully")
+    try:
+        db = DatabaseManager(database_url)
+        db.connect()
+        db.create_tables()
+        
+        # Log successful initialization
+        logger.info("✅ Database tables created successfully")
+        
+        # Test the connection with a simple query
+        with db.get_session() as session:
+            from sqlalchemy import text
+            result = session.execute(text("SELECT 1"))
+            result.fetchone()
+            logger.info("✅ Database connection test passed")
+        
+        db.close_connection()
+        logger.info("✅ Database initialized successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        raise
 
 def get_database_stats() -> Dict[str, Any]:
     """Get database statistics"""
