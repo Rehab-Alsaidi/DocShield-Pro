@@ -942,6 +942,19 @@ def create_enhanced_app():
             logger.error(f"❌ Failed to save to database: {e}")
             return None
 
+    # Register API Blueprint
+    try:
+        from app.api.routes import api_bp
+        app.register_blueprint(api_bp, url_prefix='/api')
+        logger.info("✅ API blueprint registered successfully")
+        
+        # Store content moderator reference for API access
+        if content_moderator:
+            app.content_moderator = content_moderator
+        
+    except ImportError as e:
+        logger.warning(f"⚠️ Could not register API blueprint: {e}")
+
     # Flask Routes
     @app.route('/')
     def index():
@@ -1065,11 +1078,14 @@ def create_enhanced_app():
             
         except Exception as e:
             logger.error(f"❌ Upload processing failed: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             return f"""
             <html><head><title>Error</title></head><body>
             <h1>❌ Processing Error</h1>
             <p>Error: {e}</p>
-            <a href="/">Try Again</a>
+            <p>Please check the Railway logs for more details.</p>
+            <a href="/" style="background: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Try Again</a>
             </body></html>
             """
 

@@ -56,8 +56,9 @@ def api_upload():
         result = current_app.content_moderator.moderate_pdf(file_path, filename)
         
         # Save results
-        results_file = current_app.content_moderator.save_results(result, 
-            f"static/uploads/results_{file_id}.json")
+        results_file = f"static/uploads/results_{file_id}.json"
+        with open(results_file, 'w') as f:
+            json.dump(result, f, indent=2, default=str)
         
         # Return response
         return jsonify({

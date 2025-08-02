@@ -286,20 +286,25 @@ document.addEventListener('DOMContentLoaded', function() {
             body: formData
         })
         .then(response => {
-            if (response.ok) {
-                return response.text();
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            throw new Error('Upload failed');
+            return response.text();
         })
         .then(html => {
-            // Replace entire page content with results
-            document.open();
-            document.write(html);
-            document.close();
+            // Check if response is actually HTML (successful) or error message
+            if (html.includes('<html') || html.includes('<!DOCTYPE')) {
+                // Replace entire page content with results
+                document.open();
+                document.write(html);
+                document.close();
+            } else {
+                throw new Error('Invalid response received');
+            }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Upload failed. Please try again.');
+            console.error('Upload Error:', error);
+            alert(`Upload failed: ${error.message}. Please try again.`);
             // Reset form
             submitBtn.disabled = false;
             submitText.classList.remove('hidden');
