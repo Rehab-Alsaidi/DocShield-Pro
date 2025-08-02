@@ -15,10 +15,35 @@ class ModelConfig:
 @dataclass
 class DatabaseConfig:
     """Database configuration"""
+    # Railway PostgreSQL database URL or fallback to SQLite for local dev
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///content_moderator.db")
-    pool_size: int = 10
-    max_overflow: int = 20
-    pool_timeout: int = 30
+    
+    # PostgreSQL connection pool settings for Railway
+    pool_size: int = int(os.getenv("DB_POOL_SIZE", "10"))
+    max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+    pool_timeout: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+    pool_recycle: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))  # 1 hour
+    
+    # Connection settings for Railway deployment
+    connect_args: dict = None
+    
+    def __post_init__(self):
+        # Configure connection args based on database type
+        if self.database_url.startswith("postgresql://"):
+            # Railway PostgreSQL connection args
+            self.connect_args = {
+                "connect_timeout": 10,
+                "application_name": "docshield_pro",
+                "sslmode": "require" if os.getenv("RAILWAY_ENVIRONMENT") else "prefer"
+            }
+        elif self.database_url.startswith("sqlite:"):
+            # SQLite connection args for local development
+            self.connect_args = {
+                "check_same_thread": False,
+                "timeout": 20
+            }
+        else:
+            self.connect_args = {}
 
 @dataclass
 class AppConfig:

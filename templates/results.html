@@ -244,7 +244,7 @@
                                         'category': violation.category,
                                         'severity': violation.severity,
                                         'page': violation.page_number,
-                                        'count': violation.evidence.count if violation.evidence.count else 1
+                                        'count': getattr(violation.evidence, 'count', 1) if hasattr(violation, 'evidence') and violation.evidence else 1
                                     }) %}
                                 {% endif %}
                             {% endfor %}
@@ -267,8 +267,8 @@
                                         {% for word_info in all_detected_words %}
                                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800 border border-red-300" title="Category: {{ word_info.category }}, Severity: {{ word_info.severity }}, Page: {{ word_info.page }}">
                                             {{ word_info.word }}
-                                            {% if word_info.count > 1 %}
-                                            <span class="ml-1 bg-red-600 text-white text-xs rounded-full px-1">{{ word_info.count }}</span>
+                                            {% if word_info.get('count', 1) > 1 %}
+                                            <span class="ml-1 bg-red-600 text-white text-xs rounded-full px-1">{{ word_info.get('count', 1) }}</span>
                                             {% endif %}
                                         </span>
                                         {% endfor %}

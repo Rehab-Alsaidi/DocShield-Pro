@@ -243,11 +243,16 @@ class DatabaseManager:
     def connect(self):
         """Establish database connection"""
         try:
+            # Get database configuration
+            connect_args = db_config.connect_args or {}
+            
             self.engine = create_engine(
                 self.database_url,
                 pool_size=db_config.pool_size,
                 max_overflow=db_config.max_overflow,
                 pool_timeout=db_config.pool_timeout,
+                pool_recycle=db_config.pool_recycle,
+                connect_args=connect_args,
                 echo=False  # Set to True for SQL debugging
             )
             

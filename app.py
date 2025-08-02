@@ -18,6 +18,18 @@ from flask import Flask, request, render_template, redirect, flash, jsonify, sen
 from werkzeug.utils import secure_filename
 import logging
 
+# Database imports
+try:
+    from database.models import (
+        DatabaseManager, DocumentDAL, AnalysisResultDAL, ViolationDAL,
+        get_db_session, init_database
+    )
+    DATABASE_AVAILABLE = True
+    logger.info("✅ Database modules imported successfully")
+except Exception as e:
+    DATABASE_AVAILABLE = False
+    logger.warning(f"⚠️ Database not available: {e}")
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('pdf_content_moderator')
@@ -455,10 +467,25 @@ def create_enhanced_app():
     app.config['SECRET_KEY'] = 'enhanced-secret-key-for-app'
     app.config['UPLOAD_FOLDER'] = 'static/uploads'
     app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+    
+    # Railway-specific configurations
+    port = int(os.getenv('PORT', 5000))
+    host = os.getenv('HOST', '0.0.0.0')
 
     # Ensure directories exist
     os.makedirs('static/uploads', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
+    
+    # Initialize database for Railway PostgreSQL
+    if DATABASE_AVAILABLE:
+        try:
+            logger.info("🗄️ Initializing PostgreSQL database...")
+            init_database()
+            logger.info("✅ Database initialized successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Database initialization failed: {e}")
+    else:
+        logger.warning("⚠️ Database functionality disabled")
 
     # Initialize original content moderator with better error handling
     content_moderator = None
@@ -847,6 +874,67 @@ def create_enhanced_app():
             except:
                 return {'status': 'error', 'message': f'Smart analysis failed: {e}', 'filename': filename}
 
+    def save_to_database(result_dict: dict, file_path: str, filename: str) -> Optional[str]:
+        """Save processing results to PostgreSQL database"""
+        if not DATABASE_AVAILABLE:
+            logger.debug("Database not available, skipping save")
+            return None
+            
+        try:
+            with get_db_session() as session:
+                # Create DAL instances
+                doc_dal = DocumentDAL(session)
+                analysis_dal = AnalysisResultDAL(session)
+                violation_dal = ViolationDAL(session)
+                
+                # Save document record
+                file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                document = doc_dal.create_document(
+                    filename=os.path.basename(file_path),
+                    original_filename=filename,
+                    file_size=file_size,
+                    file_path=file_path,
+                    processing_status='completed'
+                )
+                
+                # Save analysis result
+                analysis_result = analysis_dal.create_analysis_result(
+                    document_id=document.id,
+                    overall_risk_level=result_dict.get('overall_risk_level', 'low'),
+                    overall_confidence=float(result_dict.get('overall_confidence', 0.5)),
+                    total_violations=int(result_dict.get('total_violations', 0)),
+                    total_pages=int(result_dict.get('total_pages', 0)),
+                    total_images=int(result_dict.get('total_images', 0)),
+                    processing_time_seconds=float(result_dict.get('processing_time_seconds', 0)),
+                    models_used=['SmartContentFilter', 'Florence-2', 'CLIP'],
+                    processing_device='cpu',
+                    summary_stats=result_dict.get('summary_stats', {}),
+                    processing_metadata=result_dict.get('processing_metadata', {})
+                )
+                
+                # Save violations
+                violations = result_dict.get('violations', [])
+                for violation in violations:
+                    if isinstance(violation, dict):
+                        violation_dal.create_violation(
+                            document_id=document.id,
+                            violation_type=violation.get('violation_type', 'text'),
+                            page_number=int(violation.get('page_number', 1)),
+                            severity=violation.get('severity', 'medium'),
+                            confidence=float(violation.get('confidence', 0.5)),
+                            category=violation.get('category', 'unknown'),
+                            description=violation.get('description', ''),
+                            evidence=violation.get('evidence', {}),
+                            risk_factors=violation.get('risk_factors', [])
+                        )
+                
+                logger.info(f"✅ Saved to database: document {document.id}")
+                return document.id
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to save to database: {e}")
+            return None
+
     # Flask Routes
     @app.route('/')
     def index():
@@ -857,6 +945,27 @@ def create_enhanced_app():
     def upload_page():
         """Upload page"""
         return render_template('upload_new.html')
+    
+    @app.route('/results')
+    def results():
+        """Results page - redirect to home if accessed directly"""
+        logger.warning("🔧 Direct access to /results route - redirecting to home")
+        return redirect('/')
+    
+    @app.route('/debug')
+    def debug():
+        """Debug information for Railway deployment"""
+        debug_info = {
+            'routes': [str(rule) for rule in app.url_map.iter_rules()],
+            'environment': {
+                'PORT': os.getenv('PORT', 'Not set'),
+                'HOST': os.getenv('HOST', 'Not set'), 
+                'DATABASE_URL': 'Set' if os.getenv('DATABASE_URL') else 'Not set',
+                'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT', 'Not set')
+            },
+            'database_available': DATABASE_AVAILABLE
+        }
+        return jsonify(debug_info)
 
     @app.route('/upload', methods=['POST'])
     def upload():
@@ -925,12 +1034,18 @@ def create_enhanced_app():
                 </body></html>
                 """
             
-            # Store result
+            # Store result to file (for backward compatibility)
             result_id = str(uuid.uuid4())
             result_file = f"logs/result_{result_id}.json"
             
             with open(result_file, 'w') as f:
                 json.dump(result, f, indent=2, default=str)
+            
+            # Save to PostgreSQL database (Railway)
+            document_id = save_to_database(result, file_path, filename)
+            if document_id:
+                result['document_id'] = document_id
+                logger.info(f"✅ Saved to database with ID: {document_id}")
             
             logger.info(f"✅ Processing completed: {filename}")
             
@@ -1346,6 +1461,9 @@ def create_enhanced_app():
     logger.info("🎯 Smart Flask app created successfully!")
     return app
 
+# Create app instance for gunicorn
+app = create_enhanced_app()
+
 if __name__ == '__main__':
     print("🎯 Starting Smart DocShield Pro...")
     print("🚀 95%+ Accuracy, Zero False Positives!")
@@ -1363,9 +1481,16 @@ if __name__ == '__main__':
     print("🔧 Check system status: http://localhost:8080/api/status")
     print("Press Ctrl+C to stop")
     
+    # Get Railway configuration
+    port = int(os.getenv('PORT', 8080))
+    host = os.getenv('HOST', '0.0.0.0')
+    debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
+    
+    print(f"🌐 Starting server on {host}:{port}")
+    
     app.run(
-        host='0.0.0.0',
-        port=8080,
-        debug=False,
+        host=host,
+        port=port,
+        debug=debug_mode,
         threaded=True
     )
