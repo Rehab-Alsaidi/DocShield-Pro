@@ -1574,23 +1574,43 @@ def create_enhanced_app():
     logger.info("🎯 Smart Flask app created successfully!")
     return app
 
-# Create app instance for gunicorn
+# Create app instance
+print("🚀 Creating enhanced app...")
 try:
     app = create_enhanced_app()
-    print("✅ Full app loaded successfully!")
+    print("✅ Full website loaded successfully!")
 except Exception as e:
-    print(f"❌ Full app failed: {e}")
-    # Fallback app if creation fails
-    from flask import Flask, jsonify
-    app = Flask(__name__)
+    print(f"❌ Full app creation failed: {e}")
+    import traceback
+    traceback.print_exc()
+    
+    # Create basic app with your website structure
+    print("🔄 Creating basic website...")
+    from flask import Flask, render_template, request, redirect, flash
+    
+    app = Flask(__name__, 
+                template_folder='templates',
+                static_folder='static')
+    app.config['SECRET_KEY'] = 'enhanced-secret-key-for-app'
+    
+    @app.route('/')
+    def index():
+        return render_template('home.html')
+    
+    @app.route('/upload-page')
+    def upload_page():
+        return render_template('upload_new.html')
+    
+    @app.route('/upload', methods=['POST'])
+    def upload():
+        flash('AI processing temporarily unavailable', 'warning')
+        return redirect('/')
     
     @app.route('/health')
     def health():
-        return jsonify({'status': 'fallback', 'error': str(e)})
+        return {'status': 'basic_mode', 'error': str(e)}
     
-    @app.route('/')
-    def home():
-        return f'<h1>PDF Content Moderator - Fallback Mode</h1><p>Error: {e}</p>'
+    print("✅ Basic website created!")
 
 if __name__ == '__main__':
     print("🎯 Starting Smart DocShield Pro...")
