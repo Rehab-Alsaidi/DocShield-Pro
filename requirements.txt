@@ -16,9 +16,10 @@ reportlab==4.0.4
 setuptools==69.0.3
 
 # Lightweight AI/ML Libraries for Railway (Optimized)
-torch==2.1.0+cpu --index-url https://download.pytorch.org/whl/cpu
-torchvision==0.16.0+cpu --index-url https://download.pytorch.org/whl/cpu
-transformers==4.35.0
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
+transformers==4.44.0
 
 # Utilities
 requests==2.31.0
