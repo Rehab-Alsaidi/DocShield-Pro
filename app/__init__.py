@@ -6,14 +6,18 @@ Main application package containing Flask app configuration,
 API routes, and core application logic.
 """
 
-from .main import create_app
-from .config import app_config, model_config, db_config
+try:
+    from .config import app_config, model_config, db_config
+except ImportError:
+    # Fallback if config modules don't exist
+    app_config = None
+    model_config = None
+    db_config = None
 
-__version__ = "1.0.0"
+__version__ = "4.0.0-railway-optimized"
 __author__ = "PDF Content Moderator Team"
 
 __all__ = [
-    'create_app',
     'app_config', 
     'model_config',
     'db_config'

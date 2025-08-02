@@ -237,36 +237,26 @@ class AdvancedVisionLanguageAnalyzer:
             logger.info("🚂 Railway environment detected - using memory-optimized model loading")
         
         try:
-            # Skip Florence-2 models - missing dependencies (timm, einops) on Railway
-            logger.info("⚡ Skipping Florence-2 models (missing dependencies: timm, einops)")
+            # Lightweight BLIP: Optimized for Railway deployment
+            logger.info("Loading lightweight BLIP model...")
+            try:
+                # Use only the lightweight base model for Railway compatibility
+                self.blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+                self.blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+                if self.device == "cuda" and torch.cuda.is_available():
+                    self.blip_model = self.blip_model.to(self.device)
+                logger.info("✅ Lightweight BLIP model loaded successfully (440MB, ~2.5GB RAM)")
+            except Exception as e:
+                logger.warning(f"Lightweight BLIP failed: {e}")
+                self.blip_model = None
+                self.blip_processor = None
+            
+            # Skip heavy models for Railway deployment
             self.florence_model = None
             self.florence_processor = None
-            
-            # Skip BLIP-2 models - they have warnings and we have working BLIP + CLIP
-            logger.info("⚡ Skipping BLIP-2 models (using regular BLIP which works fine)")
             self.blip2_model = None
             self.blip2_processor = None
-            
-            # Fallback to regular BLIP with multiple model options
-            if self.blip2_model is None:
-                logger.info("Loading BLIP model as fallback...")
-                blip_models = [
-                    "Salesforce/blip-image-captioning-base",  # Smaller, more reliable
-                    "Salesforce/blip-image-captioning-large",
-                    "microsoft/DialoGPT-medium"  # Alternative for text generation
-                ]
-                
-                for model_name in blip_models:
-                    try:
-                        self.blip_processor = BlipProcessor.from_pretrained(model_name)
-                        self.blip_model = BlipForConditionalGeneration.from_pretrained(model_name)
-                        if self.device == "cuda" and torch.cuda.is_available():
-                            self.blip_model = self.blip_model.to(self.device)
-                        logger.info(f"✅ BLIP model loaded successfully: {model_name}")
-                        break
-                    except Exception as e:
-                        logger.warning(f"BLIP model {model_name} failed: {e}")
-                        continue
+            logger.info("🚀 Heavy models skipped for Railway optimization")
                     
         except Exception as e:
             logger.error(f"Failed to load advanced vision models: {e}")
@@ -313,99 +303,108 @@ class AdvancedVisionLanguageAnalyzer:
         return results
     
     def _generate_detailed_caption(self, image: Image.Image) -> str:
-        """Generate detailed caption with Florence-2"""
+        """Generate detailed caption with lightweight BLIP"""
         try:
-            # Advanced prompting for detailed, culturally-aware description
-            task_prompt = "<MORE_DETAILED_CAPTION>"
+            if not self.blip_model or not self.blip_processor:
+                return ""
             
-            inputs = self.florence_processor(text=task_prompt, images=image, return_tensors="pt")
+            # Use lightweight BLIP for caption generation
+            inputs = self.blip_processor(images=image, return_tensors="pt")
             if self.device == "cuda" and torch.cuda.is_available():
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             with torch.no_grad():
-                generated_ids = self.florence_model.generate(
-                    input_ids=inputs["input_ids"],
-                    pixel_values=inputs["pixel_values"],
-                    max_new_tokens=150,
+                generated_ids = self.blip_model.generate(
+                    **inputs,
+                    max_length=50,
                     num_beams=3,
                     do_sample=False
                 )
             
-            generated_text = self.florence_processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-            
-            # Extract the caption part
-            caption = generated_text.split(task_prompt)[-1].strip()
-            return caption
+            caption = self.blip_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            return caption.strip()
             
         except Exception as e:
-            logger.warning(f"Florence-2 caption generation failed: {e}")
+            logger.warning(f"Lightweight BLIP caption generation failed: {e}")
             return ""
     
     def _assess_cultural_appropriateness(self, image: Image.Image) -> str:
-        """Assess cultural appropriateness with BLIP-2 using contextual prompting"""
+        """Assess cultural appropriateness with lightweight BLIP"""
         try:
-            # Advanced cultural context prompting
-            cultural_prompt = """Analyze this image for cultural appropriateness according to Middle Eastern and Islamic guidelines. Consider:
-            1. Modesty standards (clothing, poses, interactions)
-            2. Mixed gender interactions 
-            3. Religious sensitivity
-            4. Cultural symbols and practices
-            5. Alcohol or gambling content
-            Provide a detailed assessment of cultural compliance."""
+            if not self.blip_model or not self.blip_processor:
+                return ""
             
-            inputs = self.blip2_processor(images=image, text=cultural_prompt, return_tensors="pt")
+            # Use lightweight BLIP for basic cultural assessment
+            inputs = self.blip_processor(images=image, return_tensors="pt")
             if self.device == "cuda" and torch.cuda.is_available():
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             with torch.no_grad():
-                generated_ids = self.blip2_model.generate(
+                generated_ids = self.blip_model.generate(
                     **inputs,
-                    max_new_tokens=200,
-                    num_beams=3,
-                    temperature=0.7,
-                    do_sample=True
+                    max_length=30,
+                    num_beams=2,
+                    do_sample=False
                 )
             
-            assessment = self.blip2_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            assessment = self.blip_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            
+            # Add basic cultural analysis based on keywords
+            caption_lower = assessment.lower()
+            cultural_concerns = []
+            
+            if any(word in caption_lower for word in ['man', 'woman', 'people', 'couple']):
+                cultural_concerns.append("Mixed gender content detected - requires cultural review")
+            if any(word in caption_lower for word in ['dress', 'clothing', 'shirt', 'outfit']):
+                cultural_concerns.append("Clothing visible - check modesty standards")
+            if any(word in caption_lower for word in ['party', 'celebration', 'gathering']):
+                cultural_concerns.append("Social gathering - verify cultural appropriateness")
+            
+            if cultural_concerns:
+                assessment += ". Cultural considerations: " + "; ".join(cultural_concerns)
+            
             return assessment.strip()
             
         except Exception as e:
-            logger.warning(f"BLIP-2 cultural assessment failed: {e}")
+            logger.warning(f"Lightweight BLIP cultural assessment failed: {e}")
             return ""
     
     def _analyze_content_appropriateness(self, image: Image.Image) -> str:
-        """Analyze content appropriateness with advanced prompting"""
+        """Analyze content appropriateness with lightweight BLIP"""
         try:
-            # Use available model for content analysis
-            model = self.blip2_model or self.blip_model
-            processor = self.blip2_processor or self.blip_processor
-            
-            if not model:
+            if not self.blip_model or not self.blip_processor:
                 return ""
             
-            # Contextual prompting for content analysis
-            content_prompt = """Describe this image in detail, focusing on:
-            - People present (gender, clothing, poses, interactions)
-            - Objects that might be culturally sensitive (alcohol, gambling items)
-            - Activities taking place
-            - Overall appropriateness for conservative cultural standards
-            Be specific and detailed."""
-            
-            if self.blip2_model:
-                inputs = processor(images=image, text=content_prompt, return_tensors="pt")
-            else:
-                inputs = processor(images=image, return_tensors="pt")
+            # Use lightweight BLIP for content analysis
+            inputs = self.blip_processor(images=image, return_tensors="pt")
             
             if self.device == "cuda" and torch.cuda.is_available():
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             with torch.no_grad():
-                if self.blip2_model:
-                    generated_ids = model.generate(**inputs, max_new_tokens=150, num_beams=2)
-                else:
-                    generated_ids = model.generate(**inputs, max_length=150, num_beams=2)
+                generated_ids = self.blip_model.generate(**inputs, max_length=50, num_beams=2)
             
-            analysis = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            analysis = self.blip_processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            
+            # Enhance analysis with cultural sensitivity keywords
+            analysis_lower = analysis.lower()
+            enhancement = []
+            
+            # Check for people and interactions
+            if any(word in analysis_lower for word in ['man', 'woman', 'person', 'people']):
+                enhancement.append("Human subjects present")
+            
+            # Check for clothing
+            if any(word in analysis_lower for word in ['dress', 'shirt', 'clothing', 'wear']):
+                enhancement.append("Clothing visible")
+            
+            # Check for activities
+            if any(word in analysis_lower for word in ['sitting', 'standing', 'walking', 'meeting']):
+                enhancement.append("Activities observed")
+            
+            if enhancement:
+                analysis += ". Analysis notes: " + ", ".join(enhancement)
+            
             return analysis.strip()
             
         except Exception as e:

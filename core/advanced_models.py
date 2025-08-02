@@ -1,11 +1,10 @@
 # core/advanced_models.py
 """
-Advanced AI Models for Professional Content Moderation
-Integrates state-of-the-art models for maximum accuracy
+Lightweight AI Models for Railway Deployment
+Optimized for memory efficiency and fast startup
 """
 
 import os
-import torch
 import warnings
 from typing import Dict, List, Tuple, Optional, Union
 from PIL import Image
@@ -18,6 +17,15 @@ warnings.filterwarnings("ignore")
 
 from utils.logger import get_logger
 logger = get_logger(__name__)
+
+# Lightweight imports only
+try:
+    import torch
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+    LIGHTWEIGHT_MODELS_AVAILABLE = True
+except ImportError:
+    LIGHTWEIGHT_MODELS_AVAILABLE = False
+    logger.warning("Lightweight models not available - running in basic mode")
 
 @dataclass
 class AdvancedAnalysisResult:
@@ -318,20 +326,24 @@ class AdvancedTextAnalyzer:
         
         return highlighted_text
 
-class AdvancedImageAnalyzer:
-    """Advanced image analysis with cultural compliance detection"""
+class LightweightImageAnalyzer:
+    """Lightweight image analysis optimized for Railway deployment"""
     
     def __init__(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cpu"  # Force CPU for Railway optimization
         self.models = {}
         self._load_models()
-        logger.info(f"Advanced Image Analyzer initialized on {self.device}")
+        logger.info(f"Lightweight Image Analyzer initialized on {self.device}")
     
     def _load_models(self):
-        """Load advanced image analysis models"""
+        """Load lightweight image analysis models"""
         try:
-            # In production, these would load actual advanced models
-            # For now, we'll use enhanced detection logic
+            # Only load lightweight BLIP model if available
+            if LIGHTWEIGHT_MODELS_AVAILABLE:
+                logger.info("Loading lightweight BLIP model...")
+                self.blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+                self.blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+                logger.info("✅ Lightweight BLIP model loaded (~440MB)")
             
             self.cultural_concepts = {
                 "prohibited_high": [
@@ -763,13 +775,16 @@ class AdvancedImageAnalyzer:
         
         return elements
 
-class AdvancedModelManager:
-    """Manages all advanced AI models for professional content moderation"""
+class LightweightModelManager:
+    """Manages lightweight AI models optimized for Railway deployment"""
     
     def __init__(self):
         self.text_analyzer = AdvancedTextAnalyzer()
-        self.image_analyzer = AdvancedImageAnalyzer()
-        logger.info("Advanced Model Manager initialized")
+        self.image_analyzer = LightweightImageAnalyzer()
+        logger.info("Lightweight Model Manager initialized")
+
+# Backward compatibility alias
+AdvancedModelManager = LightweightModelManager
     
     def analyze_content_comprehensive(self, text_content: List[str], images: List[Image.Image], 
                                    image_captions: List[str]) -> AdvancedAnalysisResult:
@@ -917,8 +932,8 @@ class AdvancedModelManager:
 
 # Example usage and testing
 if __name__ == "__main__":
-    # Initialize advanced models
-    model_manager = AdvancedModelManager()
+    # Initialize lightweight models
+    model_manager = LightweightModelManager()
     
     # Test text analysis
     sample_text = "The party featured alcohol and dancing with mixed groups."

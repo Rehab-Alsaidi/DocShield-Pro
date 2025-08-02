@@ -23,38 +23,14 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
 # Virtual environments
-.env
-.venv
-env/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
+.venv/
+.env/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -71,22 +47,45 @@ ehthumbs.db
 Thumbs.db
 
 # Application specific
-logs/*.json
-logs/*.pdf
-logs/*.log
 static/uploads/*
 !static/uploads/.gitkeep
-static/reports/*
-!static/reports/.gitkeep
-static/results/*
-!static/results/.gitkeep
-results/
-reports/
+logs/*.log
+logs/*.json
+!logs/.gitkeep
+*.sqlite
+*.db
 
 # Model cache
-models/
-.transformers_cache/
 .cache/
+models/
+transformers_cache/
 
-# Railway/Production
+# Temporary files
+*.tmp
+*.temp
+test_*.py
+temp_*
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database
+*.sqlite3
+*.db
+init_railway_db.py
+setup_railway_db.py
+deploy_railway.py
+migrate_database.py
+
+# Reports
+reports/*.pdf
+
+# Secrets
+config/secrets.yaml
+config/production.yaml
+.env*
+
+# Railway specific
 .railway/

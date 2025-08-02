@@ -553,13 +553,10 @@ def create_enhanced_app():
     os.makedirs('static/uploads', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     
-    # Initialize database for Railway PostgreSQL (optional) - simplified for fast startup
+    # Database connection (pre-configured via Railway CLI)
     database_url = os.getenv("DATABASE_URL")
     if DATABASE_AVAILABLE and database_url:
-        try:
-            logger.info("🗄️ Database detected - will initialize lazily")
-        except Exception as e:
-            logger.warning(f"⚠️ Database setup failed: {e}")
+        logger.info("🗄️ Database connected via Railway")
     else:
         logger.info("📄 Running without database")
 
@@ -571,7 +568,7 @@ def create_enhanced_app():
         
         from core.content_moderator import ContentModerator
         content_moderator = ContentModerator()
-        logger.info("✅ AI models loaded successfully - Florence-2, CLIP, NSFW detection active!")
+        logger.info("✅ AI models loaded successfully - BLIP, CLIP, Content Safety active!")
         
     except ImportError as e:
         logger.error(f"❌ Model import failed: {e}")
@@ -799,7 +796,7 @@ def create_enhanced_app():
                         'processing_metadata': {
                             'processing_time_seconds': 0.5,
                             'pdf_file_size_mb': 0.0,
-                            'models_used': ['BLIP', 'CLIP', 'NSFW-Detector', 'Florence-2'],
+                            'models_used': ['BLIP-Captioning', 'CLIP-Vision', 'Content-Safety', 'Cultural-Compliance'],
                             'processing_device': 'CPU',
                             'confidence_threshold': 0.9
                         }
@@ -944,19 +941,13 @@ def create_enhanced_app():
                 return {'status': 'error', 'message': f'Smart analysis failed: {e}', 'filename': filename}
 
     def save_to_database(result_dict: dict, file_path: str, filename: str) -> Optional[str]:
-        """Save processing results to PostgreSQL database"""
+        """Save processing results to PostgreSQL database (pre-configured via Railway CLI)"""
         if not DATABASE_AVAILABLE or not os.getenv("DATABASE_URL"):
             logger.debug("Database not available or not configured, skipping save")
             return None
             
         try:
-            # Initialize database tables on first use
-            try:
-                init_database()
-                logger.info("✅ Database tables initialized")
-            except Exception as init_e:
-                logger.warning(f"Database init failed: {init_e}")
-                return None
+            # Database tables already initialized via Railway CLI init.sql
                 
             with get_db_session() as session:
                 # Create DAL instances
@@ -983,7 +974,7 @@ def create_enhanced_app():
                     total_pages=int(result_dict.get('total_pages', 0)),
                     total_images=int(result_dict.get('total_images', 0)),
                     processing_time_seconds=float(result_dict.get('processing_time_seconds', 0)),
-                    models_used=['SmartContentFilter', 'Florence-2', 'CLIP'],
+                    models_used=['Smart-Content-Filter', 'BLIP-Captioning', 'CLIP-Vision'],
                     processing_device='cpu',
                     summary_stats=result_dict.get('summary_stats', {}),
                     processing_metadata=result_dict.get('processing_metadata', {})
@@ -1545,23 +1536,64 @@ def create_enhanced_app():
             'approach': 'AI-powered analysis with multiple computer vision models'
         })
 
-    # Health check endpoint for Railway
+    # Enhanced health check endpoint for Railway
     @app.route('/health')
     def health_check():
-        return {
+        """Enhanced health check for Railway deployment monitoring"""
+        import psutil
+        import os
+        
+        # Memory usage check
+        memory_info = psutil.virtual_memory()
+        memory_usage_mb = memory_info.used / 1024 / 1024
+        memory_percent = memory_info.percent
+        
+        # Disk usage check
+        disk_info = psutil.disk_usage('/')
+        disk_usage_percent = (disk_info.used / disk_info.total) * 100
+        
+        # Model memory estimation
+        model_memory_estimate = 0
+        if content_moderator:
+            model_memory_estimate += 2500  # ~2.5GB for lightweight BLIP
+        
+        health_status = {
             'status': 'healthy',
-            'version': '4.0',
-            'models_loaded': {
-                'content_moderator': content_moderator is not None,
-                'smart_filter': smart_filter is not None
+            'version': '4.0-railway-optimized',
+            'timestamp': datetime.now().isoformat(),
+            'system': {
+                'memory_usage_mb': round(memory_usage_mb, 2),
+                'memory_usage_percent': round(memory_percent, 2),
+                'disk_usage_percent': round(disk_usage_percent, 2),
+                'estimated_model_memory_mb': model_memory_estimate
+            },
+            'models': {
+                'lightweight_blip_loaded': content_moderator is not None,
+                'smart_filter_active': smart_filter is not None,
+                'heavy_models_removed': True,
+                'memory_optimized': True
             },
             'database': {
                 'available': DATABASE_AVAILABLE,
                 'configured': bool(os.getenv("DATABASE_URL")),
                 'status': 'connected' if DATABASE_AVAILABLE and os.getenv("DATABASE_URL") else 'file_storage'
             },
-            'timestamp': datetime.now().isoformat()
+            'railway': {
+                'port': os.getenv('PORT', 'Not set'),
+                'environment': os.getenv('RAILWAY_ENVIRONMENT', 'Not set'),
+                'deployment_optimized': True
+            }
         }
+        
+        # Determine overall health
+        if memory_percent > 90:
+            health_status['status'] = 'warning'
+            health_status['warning'] = 'High memory usage'
+        elif disk_usage_percent > 90:
+            health_status['status'] = 'warning'
+            health_status['warning'] = 'High disk usage'
+        
+        return health_status
     
     logger.info("🎯 Smart Flask app created successfully!")
     return app

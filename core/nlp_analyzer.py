@@ -10,6 +10,7 @@ import logging
 from collections import Counter
 # Optional NLP libraries with graceful fallbacks
 SPACY_AVAILABLE = False
+SENTENCE_TRANSFORMERS_AVAILABLE = False  # Added for Railway optimization
 spacy = None
 
 try:
@@ -19,6 +20,9 @@ try:
 except Exception as e:
     print(f"⚠️ Spacy not available: {e}")
     SPACY_AVAILABLE = False
+
+# Sentence transformers removed for Railway optimization
+print("⚡ Sentence transformers disabled for Railway optimization")
 
 from utils.logger import get_logger
 

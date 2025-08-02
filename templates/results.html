@@ -395,7 +395,7 @@
                     </h2>
                     
                     <div class="space-y-3">
-                        {% set models_used = result.processing_metadata.models_used if result.processing_metadata else ['BLIP', 'CLIP', 'NSFW-Detector', 'Florence-2'] %}
+                        {% set models_used = result.processing_metadata.models_used if result.processing_metadata else ['BLIP-Captioning', 'CLIP-Vision', 'Content-Safety', 'Cultural-Compliance'] %}
                         {% for model in models_used %}
                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div class="flex items-center">

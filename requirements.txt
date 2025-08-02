@@ -1,4 +1,4 @@
-# PDF Content Moderator - Working AI Models Requirements
+# PDF Content Moderator - Lightweight Railway Optimized
 # Core Web Framework
 Flask==2.3.3
 Werkzeug==2.3.7
@@ -15,20 +15,21 @@ reportlab==4.0.4
 # Railway deployment compatibility
 setuptools==69.0.3
 
-# AI/ML Libraries for Railway
-torch==2.5.1
-torchvision==0.20.1
-transformers==4.45.0
-sentence-transformers==3.3.1
+# Lightweight AI/ML Libraries for Railway (Optimized)
+torch==2.1.0+cpu --index-url https://download.pytorch.org/whl/cpu
+torchvision==0.16.0+cpu --index-url https://download.pytorch.org/whl/cpu
+transformers==4.35.0
 
 # Utilities
 requests==2.31.0
 python-dateutil==2.8.2
 tqdm==4.66.1
+numpy==1.24.4
+psutil==5.9.6
 
 # Database (PostgreSQL for Railway)
 psycopg2-binary==2.9.7
 SQLAlchemy==2.0.21
 
-# Production Server (optional)
+# Production Server
 gunicorn==21.2.0
