@@ -587,6 +587,7 @@ def create_enhanced_app():
             total_words = 0
             total_sentences = 0
             risk_keywords = []
+            detected_words_with_pages = []
             
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
@@ -607,8 +608,15 @@ def create_enhanced_app():
                         result = smart_filter.analyze_content(page_text, "")
                         if result.get('is_violation', False):
                             violations = result.get('violations', [])
+                            categories = result.get('categories', [])
                             for cat, word in violations:
                                 risk_keywords.append(word)
+                                detected_words_with_pages.append({
+                                    'word': word,
+                                    'page': page_num + 1,
+                                    'category': cat,
+                                    'severity': 'high' if cat in ['non_islamic_religious', 'haram_alcohol', 'explicit_sexual'] else 'medium'
+                                })
             
             pdf_document.close()
             
@@ -620,7 +628,8 @@ def create_enhanced_app():
                 "languages_detected": ["english"],
                 "avg_sentiment": 0,
                 "avg_text_quality": 0.8,
-                "risk_keywords": risk_keywords[:10]  # First 10 risk keywords found
+                "risk_keywords": risk_keywords[:10],  # First 10 risk keywords found
+                "detected_words_with_pages": detected_words_with_pages  # Words with page numbers
             }
             
         except Exception as e:
@@ -633,7 +642,8 @@ def create_enhanced_app():
                 "languages_detected": [],
                 "avg_sentiment": 0,
                 "avg_text_quality": 0,
-                "risk_keywords": []
+                "risk_keywords": [],
+                "detected_words_with_pages": []
             }
 
     async def moderate_pdf_smart(file_path: str, filename: str, cultural_context: str = "islamic"):
@@ -1232,6 +1242,57 @@ def create_enhanced_app():
             Generated on: {datetime.now().strftime("%Y-%m-%d at %H:%M:%S")}
             </para>
             """
+            # Add Text Analysis Section
+            if result_data.get('summary_stats', {}).get('text_stats', {}).get('detected_words_with_pages'):
+                story.append(PageBreak())
+                story.append(Paragraph("📝 Detected Words Analysis", styles['Heading2']))
+                story.append(Spacer(1, 12))
+                
+                detected_words = result_data['summary_stats']['text_stats']['detected_words_with_pages']
+                text_stats = result_data['summary_stats']['text_stats']
+                
+                # Text analysis summary
+                summary_text = f"""
+                <b>Text Content Analysis Summary</b><br/>
+                Total Pages with Text: {text_stats.get('total_pages_with_text', 0)}<br/>
+                Total Words: {text_stats.get('total_words', 0)}<br/>
+                Total Sentences: {text_stats.get('total_sentences', 0)}<br/>
+                Risk Keywords Found: {text_stats.get('total_risk_keywords', 0)}<br/>
+                """
+                story.append(Paragraph(summary_text, styles['Normal']))
+                story.append(Spacer(1, 12))
+                
+                if detected_words:
+                    story.append(Paragraph("🚨 Problematic Words Detected", styles['Heading3']))
+                    story.append(Spacer(1, 8))
+                    
+                    # Create table of detected words
+                    word_data = [['Word', 'Page', 'Category', 'Severity']]
+                    for word_info in detected_words:
+                        word_data.append([
+                            word_info.get('word', ''),
+                            str(word_info.get('page', '')),
+                            word_info.get('category', '').replace('_', ' ').title(),
+                            word_info.get('severity', '').title()
+                        ])
+                    
+                    word_table = Table(word_data, colWidths=[2*inch, 0.8*inch, 1.5*inch, 1*inch])
+                    word_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fef2f2')),
+                        ('PADDING', (0, 0), (-1, -1), 6),
+                    ]))
+                    story.append(word_table)
+                    story.append(Spacer(1, 12))
+                else:
+                    story.append(Paragraph("✅ No problematic words detected in text content.", styles['Normal']))
+                    story.append(Spacer(1, 12))
+
             story.append(Paragraph(footer_text, styles['Normal']))
             
             # Build PDF

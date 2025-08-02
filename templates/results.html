@@ -228,19 +228,27 @@
                     </div>
                     
                     <div class="p-8">
-                        {% set text_violations = result.violations|selectattr('violation_type', 'equalto', 'text')|list if result.violations else [] %}
+                        <!-- Extract detected words from new text analysis structure -->
                         {% set all_detected_words = [] %}
-                        {% for violation in text_violations %}
-                            {% if violation.evidence and violation.evidence.keyword %}
-                                {% set _ = all_detected_words.append({
-                                    'word': violation.evidence.keyword,
-                                    'category': violation.category,
-                                    'severity': violation.severity,
-                                    'page': violation.page_number,
-                                    'count': violation.evidence.count if violation.evidence.count else 1
-                                }) %}
-                            {% endif %}
-                        {% endfor %}
+                        {% if result.summary_stats and result.summary_stats.text_stats and result.summary_stats.text_stats.detected_words_with_pages %}
+                            {% set all_detected_words = result.summary_stats.text_stats.detected_words_with_pages %}
+                        {% endif %}
+                        
+                        <!-- Fallback: Check old structure for backwards compatibility -->
+                        {% if not all_detected_words %}
+                            {% set text_violations = result.violations|selectattr('violation_type', 'equalto', 'text')|list if result.violations else [] %}
+                            {% for violation in text_violations %}
+                                {% if violation.evidence and violation.evidence.keyword %}
+                                    {% set _ = all_detected_words.append({
+                                        'word': violation.evidence.keyword,
+                                        'category': violation.category,
+                                        'severity': violation.severity,
+                                        'page': violation.page_number,
+                                        'count': violation.evidence.count if violation.evidence.count else 1
+                                    }) %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                         
                         <div class="mb-6">
                             <h3 class="text-xl font-bold text-blue-800 mb-4 flex items-center">
