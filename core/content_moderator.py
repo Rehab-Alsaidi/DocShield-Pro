@@ -575,28 +575,28 @@ class ContentModerator:
         image_stats = {
             "total_images": len(image_results),
             "images_with_violations": len(set(v.page_number for v in violations if v.violation_type == "image")),
-            "avg_image_size": tuple(map(int, np.mean([img.size for img in image_results], axis=0))) if image_results else (0, 0),
-            "image_formats": list(set(img.format for img in image_results)),
-            "avg_caption_length": np.mean([len(img.caption.split()) for img in image_results]) if image_results else 0
+            "avg_image_size": (0, 0),  # Simplified without numpy
+            "image_formats": list(set(getattr(img, 'format', 'unknown') for img in image_results)),
+            "avg_caption_length": sum(len(getattr(img, 'caption', '').split()) for img in image_results) / len(image_results) if image_results else 0
         }
         
         # Vision analysis statistics
         vision_stats = {
-            "avg_nsfw_score": np.mean([v.nsfw_score for v in vision_results]) if vision_results else 0,
-            "high_risk_images": len([v for v in vision_results if v.risk_level == "high"]),
+            "avg_nsfw_score": sum(getattr(v, 'nsfw_score', 0) for v in vision_results) / len(vision_results) if vision_results else 0,
+            "high_risk_images": len([v for v in vision_results if getattr(v, 'risk_level', '') == "high"]),
             "detected_categories": self._get_top_detected_categories(vision_results),
-            "avg_confidence": np.mean([v.confidence for v in vision_results]) if vision_results else 0
+            "avg_confidence": sum(getattr(v, 'confidence', 0) for v in vision_results) / len(vision_results) if vision_results else 0
         }
         
         # Text statistics
         text_stats = {
             "total_pages_with_text": len(text_results),
-            "total_words": sum(t.total_words for t in text_results),
-            "total_sentences": sum(t.total_sentences for t in text_results),
-            "languages_detected": list(set(t.language for t in text_results if t.language != "unknown")),
-            "avg_sentiment": np.mean([t.sentiment_score for t in text_results]) if text_results else 0,
-            "total_risk_keywords": sum(len(t.risk_keywords) for t in text_results),
-            "avg_text_quality": np.mean([t.text_quality_score for t in text_results]) if text_results else 0
+            "total_words": sum(getattr(t, 'total_words', 0) for t in text_results),
+            "total_sentences": sum(getattr(t, 'total_sentences', 0) for t in text_results),
+            "languages_detected": list(set(getattr(t, 'language', 'unknown') for t in text_results if getattr(t, 'language', 'unknown') != "unknown")),
+            "avg_sentiment": sum(getattr(t, 'sentiment_score', 0) for t in text_results) / len(text_results) if text_results else 0,
+            "total_risk_keywords": sum(len(getattr(t, 'risk_keywords', [])) for t in text_results),
+            "avg_text_quality": sum(getattr(t, 'text_quality_score', 0) for t in text_results) / len(text_results) if text_results else 0
         }
         
         # Violation statistics
@@ -612,7 +612,7 @@ class ContentModerator:
                 "text": len([v for v in violations if v.violation_type == "text"])
             },
             "most_common_categories": self._get_most_common_violation_categories(violations),
-            "avg_violation_confidence": np.mean([v.confidence for v in violations]) if violations else 0
+            "avg_violation_confidence": sum(v.confidence for v in violations) / len(violations) if violations else 0
         }
         
         return {

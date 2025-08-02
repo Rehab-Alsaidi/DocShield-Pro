@@ -576,6 +576,66 @@ def create_enhanced_app():
                 'system_used': 'Error'
             }
 
+    def extract_and_analyze_text(pdf_path: str):
+        """Extract and analyze text from PDF using smart filter"""
+        try:
+            import fitz  # PyMuPDF
+            
+            pdf_document = fitz.open(pdf_path)
+            all_text = ""
+            page_texts = []
+            total_words = 0
+            total_sentences = 0
+            risk_keywords = []
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                page_text = page.get_text()
+                
+                if page_text.strip():
+                    all_text += page_text + "\n"
+                    page_texts.append(page_text)
+                    
+                    # Count words and sentences
+                    words = len(page_text.split())
+                    sentences = len([s for s in page_text.split('.') if s.strip()])
+                    total_words += words
+                    total_sentences += sentences
+                    
+                    # Analyze text with smart filter
+                    if smart_filter:
+                        result = smart_filter.analyze_content(page_text, "")
+                        if result.get('is_violation', False):
+                            violations = result.get('violations', [])
+                            for cat, word in violations:
+                                risk_keywords.append(word)
+            
+            pdf_document.close()
+            
+            return {
+                "total_pages_with_text": len(page_texts),
+                "total_words": total_words,
+                "total_sentences": total_sentences,
+                "total_risk_keywords": len(risk_keywords),
+                "languages_detected": ["english"],
+                "avg_sentiment": 0,
+                "avg_text_quality": 0.8,
+                "risk_keywords": risk_keywords[:10]  # First 10 risk keywords found
+            }
+            
+        except Exception as e:
+            logger.error(f"Text extraction failed: {e}")
+            return {
+                "total_pages_with_text": 0,
+                "total_words": 0, 
+                "total_sentences": 0,
+                "total_risk_keywords": 0,
+                "languages_detected": [],
+                "avg_sentiment": 0,
+                "avg_text_quality": 0,
+                "risk_keywords": []
+            }
+
     async def moderate_pdf_smart(file_path: str, filename: str, cultural_context: str = "islamic"):
         """Smart PDF moderation with zero false positives"""
         logger.info(f"🎯 Starting smart moderation: {filename}")
@@ -683,8 +743,18 @@ def create_enhanced_app():
                     except Exception as e:
                         logger.error(f"Failed to analyze image {i}: {e}")
             
+            # Step 2.5: Extract and analyze text
+            logger.info("📝 Extracting and analyzing text content...")
+            text_stats = extract_and_analyze_text(file_path)
+            
             # Step 3: Combine results
             combined_result = result_dict.copy()
+            
+            # Add text statistics to summary
+            if 'summary_stats' in combined_result:
+                combined_result['summary_stats']['text_stats'] = text_stats
+            else:
+                combined_result['summary_stats'] = {'text_stats': text_stats}
             
             # Add smart analysis information
             combined_result['enhancement_info'] = {

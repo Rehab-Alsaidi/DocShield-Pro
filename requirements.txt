@@ -3,8 +3,7 @@
 Flask==2.3.3
 Werkzeug==2.3.7
 
-# Core Processing Libraries - Stable Versions
-numpy==1.24.3
+# Core Processing Libraries - Railway Compatible
 Pillow==10.0.1
 
 # PDF Processing
@@ -13,8 +12,8 @@ PyMuPDF==1.23.5
 # Report Generation
 reportlab==4.0.4
 
-# Basic NLP (lightweight)
-spacy==3.6.1
+# Railway deployment compatibility
+setuptools==69.0.3
 
 # Utilities
 requests==2.31.0

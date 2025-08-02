@@ -142,7 +142,7 @@ class TextExtractor:
         header_threshold = page_height * 0.15
         footer_threshold = page_height * 0.85
         
-        avg_y = np.mean(y_positions)
+        avg_y = sum(y_positions) / len(y_positions) if y_positions else 0
         
         if avg_y < header_threshold:
             return "header"
@@ -150,7 +150,7 @@ class TextExtractor:
             return "footer"
         
         # Check for title (larger font size)
-        avg_font_size = np.mean([font["size"] for font in font_info])
+        avg_font_size = sum(font["size"] for font in font_info) / len(font_info) if font_info else 12
         if avg_font_size > 16:  # Typically titles have larger fonts
             return "title"
         
@@ -544,7 +544,7 @@ class NLPAnalyzer:
             
             # Average sentence length
             valid_sentences = [s for s in sentences if s.strip()]
-            avg_sentence_length = np.mean([len(s.split()) for s in valid_sentences]) if valid_sentences else 0
+            avg_sentence_length = sum(len(s.split()) for s in valid_sentences) / len(valid_sentences) if valid_sentences else 0
             sentence_score = min(1.0, avg_sentence_length / 15.0)  # 15 words is good average
             
             # Readability (simple heuristic)
@@ -597,11 +597,11 @@ class NLPAnalyzer:
             sentences = re.split(r'[.!?]+', text)
             
             # Average word length
-            avg_word_length = np.mean([len(word) for word in words]) if words else 0
+            avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
             
             # Average sentence length
             valid_sentences = [s for s in sentences if s.strip()]
-            avg_sentence_length = np.mean([len(s.split()) for s in valid_sentences]) if valid_sentences else 0
+            avg_sentence_length = sum(len(s.split()) for s in valid_sentences) / len(valid_sentences) if valid_sentences else 0
             
             # Punctuation density
             punctuation_count = sum(1 for char in text if char in '.,;:!?')
