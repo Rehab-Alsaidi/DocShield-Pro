@@ -476,16 +476,17 @@ def create_enhanced_app():
     os.makedirs('static/uploads', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     
-    # Initialize database for Railway PostgreSQL
-    if DATABASE_AVAILABLE:
+    # Initialize database for Railway PostgreSQL (optional)
+    if DATABASE_AVAILABLE and os.getenv("DATABASE_URL"):
         try:
             logger.info("🗄️ Initializing PostgreSQL database...")
             init_database()
             logger.info("✅ Database initialized successfully")
         except Exception as e:
             logger.warning(f"⚠️ Database initialization failed: {e}")
+            logger.info("📄 App will continue without database (using file storage)")
     else:
-        logger.warning("⚠️ Database functionality disabled")
+        logger.info("📄 Running without database (DATABASE_URL not set)")
 
     # Initialize original content moderator with better error handling
     content_moderator = None
@@ -876,8 +877,8 @@ def create_enhanced_app():
 
     def save_to_database(result_dict: dict, file_path: str, filename: str) -> Optional[str]:
         """Save processing results to PostgreSQL database"""
-        if not DATABASE_AVAILABLE:
-            logger.debug("Database not available, skipping save")
+        if not DATABASE_AVAILABLE or not os.getenv("DATABASE_URL"):
+            logger.debug("Database not available or not configured, skipping save")
             return None
             
         try:
@@ -1454,6 +1455,11 @@ def create_enhanced_app():
             'models_loaded': {
                 'content_moderator': content_moderator is not None,
                 'smart_filter': smart_filter is not None
+            },
+            'database': {
+                'available': DATABASE_AVAILABLE,
+                'configured': bool(os.getenv("DATABASE_URL")),
+                'status': 'connected' if DATABASE_AVAILABLE and os.getenv("DATABASE_URL") else 'file_storage'
             },
             'timestamp': datetime.now().isoformat()
         }
