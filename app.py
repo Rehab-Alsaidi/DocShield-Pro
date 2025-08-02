@@ -1598,8 +1598,17 @@ def create_enhanced_app():
     logger.info("🎯 Smart Flask app created successfully!")
     return app
 
-# Create app instance for gunicorn
-app = create_enhanced_app()
+# Simple app for Railway
+from flask import Flask, jsonify
+app = Flask(__name__)
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok'})
+
+@app.route('/')
+def home():
+    return '<h1>PDF Content Moderator</h1>'
 
 if __name__ == '__main__':
     print("🎯 Starting Smart DocShield Pro...")
