@@ -1,21 +1,39 @@
 #!/usr/bin/env python3
+import sys
 import os
-from flask import Flask, jsonify
+import json
+import uuid
+import asyncio
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Any, Union
+from flask import Flask, request, render_template, redirect, flash, jsonify, send_file
+from werkzeug.utils import secure_filename
+import logging
 
-# Simple Flask app for Railway
-app = Flask(__name__)
+# Setup logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('pdf_content_moderator')
 
-@app.route('/health')
-def health():
-    return jsonify({'status': 'ok'})
+# Database imports
+try:
+    from database.models import (
+        DatabaseManager, DocumentDAL, AnalysisResultDAL, ViolationDAL,
+        get_db_session, init_database
+    )
+    DATABASE_AVAILABLE = True
+    logger.info("✅ Database modules imported successfully")
+except Exception as e:
+    DATABASE_AVAILABLE = False
+    logger.warning(f"⚠️ Database not available: {e}")
 
-@app.route('/')
-def home():
-    return '<h1>PDF Content Moderator</h1>'
+# Add current directory to Python path
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
 
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+# Simple but HIGHLY accurate content filter
+class SmartContentFilter:
     """
     Professional Content Filter for Cultural Compliance
     
@@ -1574,16 +1592,11 @@ def create_enhanced_app():
     logger.info("🎯 Smart Flask app created successfully!")
     return app
 
-# Force create the app without any try-catch that's hiding errors
-print("🚀 Creating enhanced app - forcing full website...")
-
-# Set environment to avoid GPU/CUDA issues
-import os
+# Create app instance for Railway
+print("🚀 Creating your full website...")
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
-
-# Create the full app directly
 app = create_enhanced_app()
-print("✅ Full website with ALL functionality loaded successfully!")
+print("✅ Full website with ALL functionality loaded!")
 
 if __name__ == '__main__':
     print("🎯 Starting Smart DocShield Pro...")
