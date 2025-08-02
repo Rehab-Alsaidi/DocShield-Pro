@@ -1,0 +1,299 @@
+# deployment/docker-compose.yml
+# Docker Compose configuration for PDF Content Moderator
+
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      target: production
+      args:
+        BUILD_TARGET: production
+    image: pdf-content-moderator:latest
+    container_name: pdf-moderator-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://moderator_user:${POSTGRES_PASSWORD}@postgres:5432/content_moderator
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - TRANSFORMERS_CACHE=/app/model_cache
+      - LOG_LEVEL=INFO
+    volumes:
+      - app_uploads:/app/static/uploads
+      - app_results:/app/static/results
+      - app_reports:/app/static/reports
+      - app_logs:/app/logs
+      - model_cache:/app/model_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - moderator_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pdf-moderator.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.pdf-moderator.tls=true"
+      - "traefik.http.routers.pdf-moderator.tls.certresolver=letsencrypt"
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: pdf-moderator-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=content_moderator
+      - POSTGRES_USER=moderator_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - moderator_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moderator_user -d content_moderator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: pdf-moderator-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - moderator_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: pdf-moderator-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+      - ssl_certs:/etc/ssl/certs
+    depends_on:
+      - app
+    networks:
+      - moderator_network
+    labels:
+      - "traefik.enable=false"
+
+  # Background worker for processing
+  worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      target: production
+    image: pdf-content-moderator:latest
+    container_name: pdf-moderator-worker
+    restart: unless-stopped
+    command: ["python", "run.py", "--mode", "worker"]
+    environment:
+      - DATABASE_URL=postgresql://moderator_user:${POSTGRES_PASSWORD}@postgres:5432/content_moderator
+      - REDIS_URL=redis://redis:6379/0
+      - TRANSFORMERS_CACHE=/app/model_cache
+      - LOG_LEVEL=INFO
+    volumes:
+      - app_uploads:/app/static/uploads
+      - app_results:/app/static/results
+      - app_reports:/app/static/reports
+      - app_logs:/app/logs
+      - model_cache:/app/model_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - moderator_network
+
+  # Monitoring and metrics (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pdf-moderator-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - moderator_network
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pdf-moderator-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - moderator_network
+    profiles:
+      - monitoring
+
+# Development override
+services:
+  app-dev:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      target: development
+    image: pdf-content-moderator:dev
+    container_name: pdf-moderator-dev
+    restart: "no"
+    ports:
+      - "8000:8000"
+      - "8888:8888"  # Jupyter notebook
+    environment:
+      - DATABASE_URL=postgresql://moderator_user:${POSTGRES_PASSWORD}@postgres:5432/content_moderator
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - TRANSFORMERS_CACHE=/app/model_cache
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../:/app  # Mount source code for development
+      - app_uploads:/app/static/uploads
+      - app_results:/app/static/results
+      - app_reports:/app/static/reports
+      - app_logs:/app/logs
+      - model_cache:/app/model_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - moderator_network
+    profiles:
+      - development
+
+# GPU-enabled service (for NVIDIA GPUs)
+  app-gpu:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      target: gpu
+    image: pdf-content-moderator:gpu
+    container_name: pdf-moderator-gpu
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://moderator_user:${POSTGRES_PASSWORD}@postgres:5432/content_moderator
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - TRANSFORMERS_CACHE=/app/model_cache
+      - CUDA_AVAILABLE=true
+      - LOG_LEVEL=INFO
+    volumes:
+      - app_uploads:/app/static/uploads
+      - app_results:/app/static/results
+      - app_reports:/app/static/reports
+      - app_logs:/app/logs
+      - model_cache:/app/model_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - moderator_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles:
+      - gpu
+
+# Persistent volumes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_results:
+    driver: local
+  app_reports:
+    driver: local
+  app_logs:
+    driver: local
+  model_cache:
+    driver: local
+  nginx_logs:
+    driver: local
+  ssl_certs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Networks
+networks:
+  moderator_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Configuration for different environments
+# Production: docker-compose up -d
+# Development: docker-compose --profile development up -d app-dev postgres redis
+# GPU: docker-compose --profile gpu up -d app-gpu postgres redis
+# Monitoring: docker-compose --profile monitoring up -d

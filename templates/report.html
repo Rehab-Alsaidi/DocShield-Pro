@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+
+{% block title %}Detailed Report - PDF Content Moderator{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: 1px solid #000 !important; }
+    }
+    
+    .report-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .executive-summary {
+        background: #f8f9fa;
+        border-left: 5px solid #007bff;
+        padding: 1.5rem;
+        border-radius: 0 10px 10px 0;
+    }
+    
+    .violation-summary-card {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .severity-high { border-left: 5px solid #dc3545; }
+    .severity-medium { border-left: 5px solid #fd7e14; }
+    .severity-low { border-left: 5px solid #198754; }
+    
+    .recommendation-item {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .progress-ring {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto;
+    }
+    
+    .progress-ring__circle {
+        stroke: #e9ecef;
+        stroke-width: 8;
+        fill: transparent;
+        r: 52;
+        cx: 60;
+        cy: 60;
+    }
+    
+    .progress-ring__meter {
+        stroke: #007bff;
+        stroke-width: 8;
+        fill: transparent;
+        r: 52;
+        cx: 60;
+        cy: 60;
+        stroke-linecap: round;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+        stroke-dasharray: 326.73;
+        stroke-dashoffset: 326.73;
+        transition: stroke-dashoffset 1s ease-in-out;
+    }
+    
+    .metadata-table th {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    .glossary-term {
+        margin-bottom: 1rem;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #007bff;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -1.8rem;
+        top: 0.5rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #007bff;
+        border: 3px solid white;
+        box-shadow: 0 0 0 3px #007bff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Report Header -->
+    <div class="report-header text-center">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-file-alt me-3"></i>
+            Content Moderation Report
+        </h1>
+        <h3>{{ result.file_name }}</h3>
+        <p class="mb-0">
+            <i class="fas fa-calendar me-2"></i>
+            Generated on {{ result.processing_timestamp[:19] }}
+        </p>
+    </div>
+
+    <!-- Print Controls -->
+    <div class="row mb-4 no-print">
+        <div class="col-12 text-center">
+            <button onclick="window.print()" class="btn btn-primary me-2">
+                <i class="fas fa-print me-2"></i>Print Report
+            </button>
+            <a href="{{ url_for('results', result_id=result_id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Results
+            </a>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="executive-summary">
+                <h2 class="mb-3">
+                    <i class="fas fa-clipboard-check me-2"></i>
+                    Executive Summary
+                </h2>
+                <div class="row">
+                    <div class="col-lg-8">
+                        <p class="lead">
+                            This report presents the results of automated content moderation analysis 
+                            performed on "<strong>{{ result.file_name }}</strong>". The analysis examined 
+                            <strong>{{ result.total_images }}</strong> images and 
+                            <strong>{{ result.total_pages }}</strong> pages of text content using 
+                            advanced AI models.
+                        </p>
+                        
+                        <div class="alert alert-{% if result.overall_risk_level == 'high' %}danger{% elif result.overall_risk_level == 'medium' %}warning{% else %}success{% endif %}" role="alert">
+                            <h5 class="alert-heading">
+                                <i class="fas fa-{% if result.overall_risk_level == 'high' %}exclamation-triangle{% elif result.overall_risk_level == 'medium' %}exclamation-circle{% else %}check-circle{% endif %} me-2"></i>
+                                Overall Risk Assessment: {{ result.overall_risk_level.upper() }}
+                            </h5>
+                            <p class="mb-0">
+                                {% if result.overall_risk_level == 'high' %}
+                                    This document contains high-risk content that requires immediate attention and potential removal.
+                                {% elif result.overall_risk_level == 'medium' %}
+                                    This document contains moderate risk content that should be reviewed and potentially modified.
+                                {% else %}
+                                    This document appears to comply with content policies with minimal risk concerns.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 text-center">
+                        <div class="progress-ring">
+                            <svg class="progress-ring" width="120" height="120">
+                                <circle class="progress-ring__circle"></circle>
+                                <circle class="progress-ring__meter" 
+                                        style="stroke-dashoffset: {{ 326.73 - (result.overall_confidence * 326.73) }}px;
+                                               stroke: {% if result.overall_confidence > 0.7 %}#198754{% elif result.overall_confidence > 0.4 %}#fd7e14{% else %}#dc3545{% endif %};"></circle>
+                            </svg>
+                            <div style="margin-top: -90px;">
+                                <h3>{{ (result.overall_confidence * 100)|round }}%</h3>
+                                <small>Confidence</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Findings -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-search me-2"></i>
+                Key Findings
+            </h2>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>
+                                Violation Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% set violation_stats = result.summary_stats.violation_stats %}
+                            
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <h3 class="text-danger">{{ violation_stats.violations_by_severity.high }}</h3>
+                                    <small class="text-muted">High Risk</small>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-warning">{{ violation_stats.violations_by_severity.medium }}</h3>
+                                    <small class="text-muted">Medium Risk</small>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-success">{{ violation_stats.violations_by_severity.low }}</h3>
+                                    <small class="text-muted">Low Risk</small>
+                                </div>
+                            </div>
+                            
+                            <ul class="list-unstyled">
+                                <li><strong>Total Violations:</strong> {{ result.total_violations }}</li>
+                                <li><strong>Average Confidence:</strong> {{ (violation_stats.avg_violation_confidence * 100)|round }}%</li>
+                                <li><strong>Violation Rate:</strong> {{ ((result.total_violations / (result.total_images + result.total_pages)) * 100)|round }}%</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-cogs me-2"></i>
+                                Processing Details
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% set processing = result.processing_metadata %}
+                            
+                            <ul class="list-unstyled">
+                                <li><strong>Processing Time:</strong> {{ processing.processing_time_seconds|round(2) }} seconds</li>
+                                <li><strong>File Size:</strong> {{ processing.pdf_file_size_mb }} MB</li>
+                                <li><strong>Processing Device:</strong> {{ processing.processing_device|upper }}</li>
+                                <li><strong>Confidence Threshold:</strong> {{ processing.confidence_threshold }}</li>
+                            </ul>
+                            
+                            <div class="mt-3">
+                                <strong>AI Models Used:</strong>
+                                <div class="mt-2">
+                                    {% for model in processing.models_used %}
+                                    <span class="badge bg-secondary me-1">{{ model }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if result.violations %}
+    <!-- Detailed Violations -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Detailed Violation Analysis
+            </h2>
+            
+            <!-- High Risk Violations -->
+            {% set high_violations = result.violations | selectattr("severity", "equalto", "high") | list %}
+            {% if high_violations %}
+            <div class="card violation-summary-card severity-high mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        High Risk Violations ({{ high_violations|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for violation in high_violations[:5] %}
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="text-danger">
+                                Page {{ violation.page_number }} - {{ violation.category.replace('_', ' ').title() }}
+                            </h6>
+                            <span class="badge bg-danger">{{ (violation.confidence * 100)|round }}%</span>
+                        </div>
+                        {% if violation.violation_type == 'image' and violation.evidence and violation.evidence.image_caption %}
+                        <div class="mb-2">
+                            <p class="mb-1 text-muted"><i class="fas fa-robot me-1"></i><strong>AI Analysis:</strong></p>
+                            <p class="mb-1 text-primary" style="font-style: italic;">"{{ violation.evidence.image_caption }}"</p>
+                        </div>
+                        <div class="alert alert-danger alert-sm py-2">
+                            <small><i class="fas fa-exclamation-triangle me-1"></i>{{ violation.description }}</small>
+                        </div>
+                        {% else %}
+                        <p class="mb-1">{{ violation.description }}</p>
+                        {% endif %}
+                        <small class="text-muted">
+                            <i class="fas fa-{% if violation.violation_type == 'image' %}image{% else %}file-text{% endif %} me-1"></i>
+                            {{ violation.violation_type.title() }} Violation
+                        </small>
+                    </div>
+                    {% endfor %}
+                    {% if high_violations|length > 5 %}
+                    <p class="text-muted mb-0">
+                        <em>... and {{ high_violations|length - 5 }} more high-risk violations</em>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Medium Risk Violations -->
+            {% set medium_violations = result.violations | selectattr("severity", "equalto", "medium") | list %}
+            {% if medium_violations %}
+            <div class="card violation-summary-card severity-medium mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Medium Risk Violations ({{ medium_violations|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for violation in medium_violations[:3] %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="text-warning">
+                                Page {{ violation.page_number }} - {{ violation.category.replace('_', ' ').title() }}
+                            </h6>
+                            <span class="badge bg-warning text-dark">{{ (violation.confidence * 100)|round }}%</span>
+                        </div>
+                        {% if violation.violation_type == 'image' and violation.evidence and violation.evidence.image_caption %}
+                        <div class="mb-2">
+                            <p class="mb-1 text-muted small"><i class="fas fa-robot me-1"></i><strong>AI Analysis:</strong></p>
+                            <p class="mb-1 text-primary small" style="font-style: italic;">"{{ violation.evidence.image_caption }}"</p>
+                        </div>
+                        <div class="alert alert-warning alert-sm py-1">
+                            <small><i class="fas fa-exclamation-triangle me-1"></i>{{ violation.description }}</small>
+                        </div>
+                        {% else %}
+                        <p class="mb-0 small">{{ violation.description }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if medium_violations|length > 3 %}
+                    <p class="text-muted mb-0 small">
+                        <em>... and {{ medium_violations|length - 3 }} more medium-risk violations</em>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detected Words Analysis -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-search me-2"></i>
+                Detected Words Analysis
+            </h2>
+            
+            {% set text_violations = result.violations | selectattr("violation_type", "equalto", "text") | list %}
+            {% set detected_words = [] %}
+            {% for violation in text_violations %}
+                {% if violation.evidence and violation.evidence.keyword %}
+                    {% set _ = detected_words.append({
+                        'word': violation.evidence.keyword,
+                        'category': violation.category,
+                        'severity': violation.severity,
+                        'page': violation.page_number,
+                        'count': violation.evidence.count if violation.evidence.count else 1
+                    }) %}
+                {% endif %}
+            {% endfor %}
+            
+            {% if detected_words %}
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Flagged Keywords Found ({{ detected_words|length }} words)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <h6 class="text-dark mb-3">Detected Keywords:</h6>
+                            <div class="d-flex flex-wrap gap-2 mb-4">
+                                {% for word_info in detected_words %}
+                                <span class="badge bg-danger fs-6 p-2" 
+                                      title="Category: {{ word_info.category }}, Severity: {{ word_info.severity }}, Page: {{ word_info.page }}">
+                                    {{ word_info.word }}
+                                    {% if word_info.count > 1 %}
+                                    <span class="badge bg-dark ms-1">{{ word_info.count }}</span>
+                                    {% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <h6 class="text-dark mb-3">Summary:</h6>
+                            <ul class="list-unstyled small">
+                                <li><strong>Total Words:</strong> {{ detected_words|length }}</li>
+                                <li><strong>Pages Affected:</strong> {{ detected_words|map(attribute='page')|unique|list|length }}</li>
+                                <li><strong>Categories:</strong> {{ detected_words|map(attribute='category')|unique|list|length }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Action Required:</strong> Review and replace these flagged words with culturally appropriate alternatives that align with Middle Eastern values and Islamic principles.
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Text Analysis Results
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle text-success display-4 mb-3"></i>
+                    <h5 class="text-success">No problematic words detected</h5>
+                    <p class="text-muted mb-0">The document's text content appears to be compliant with cultural standards and guidelines.</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-lightbulb me-2"></i>
+                Recommendations
+            </h2>
+            
+            {% set recommendations = [] %}
+            
+            {% if result.overall_risk_level == 'high' %}
+                {% set _ = recommendations.append("URGENT: This document contains high-risk content that requires immediate review and potential removal.") %}
+            {% endif %}
+            
+            {% if result.total_violations > 10 %}
+                {% set _ = recommendations.append("The document contains numerous content violations. Consider comprehensive content review and editing.") %}
+            {% endif %}
+            
+            {% set violation_categories = {} %}
+            {% for violation in result.violations %}
+                {% set category = violation.category %}
+                {% if category in violation_categories %}
+                    {% set _ = violation_categories.update({category: violation_categories[category] + 1}) %}
+                {% else %}
+                    {% set _ = violation_categories.update({category: 1}) %}
+                {% endif %}
+            {% endfor %}
+            
+            {% for category, count in violation_categories.items() %}
+                {% if count >= 3 %}
+                    {% set _ = recommendations.append("Multiple instances of " + category.replace('_', ' ') + " content detected (" + count|string + " violations). Review and address systematically.") %}
+                {% endif %}
+            {% endfor %}
+            
+            {% if recommendations|length == 0 %}
+                {% if result.overall_risk_level == 'medium' %}
+                    {% set _ = recommendations.append("Document contains moderate risk content. Review flagged sections for compliance.") %}
+                {% elif result.overall_risk_level == 'low' %}
+                    {% set _ = recommendations.append("Document appears to be compliant with content policies.") %}
+                {% endif %}
+            {% endif %}
+            
+            <!-- Add general recommendations -->
+            {% set _ = recommendations.extend([
+                "Implement regular content auditing processes for future submissions.",
+                "Provide content policy training to content creators and editors.",
+                "Consider automated content filtering for similar documents."
+            ]) %}
+            
+            {% for recommendation in recommendations %}
+            <div class="recommendation-item">
+                <div class="d-flex">
+                    <div class="me-3">
+                        <i class="fas fa-{% if loop.index == 1 and result.overall_risk_level == 'high' %}exclamation-triangle text-danger{% else %}check-circle text-success{% endif %}"></i>
+                    </div>
+                    <div>
+                        <strong>{{ loop.index }}.</strong> {{ recommendation }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Technical Appendix -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-cog me-2"></i>
+                Technical Appendix
+            </h2>
+            
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Analysis Timeline</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <h6>Document Upload</h6>
+                                    <small class="text-muted">PDF received and validated</small>
+                                </div>
+                                <div class="timeline-item">
+                                    <h6>Content Extraction</h6>
+                                    <small class="text-muted">Images and text extracted from PDF</small>
+                                </div>
+                                <div class="timeline-item">
+                                    <h6>AI Analysis</h6>
+                                    <small class="text-muted">Florence-2, CLIP, and NLP models applied</small>
+                                </div>
+                                <div class="timeline-item">
+                                    <h6>Report Generation</h6>
+                                    <small class="text-muted">Results compiled and formatted</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Glossary -->
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-book me-2"></i>
+                Glossary
+            </h2>
+            
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="glossary-term">
+                        <h6>NSFW</h6>
+                        <p class="small text-muted">Not Safe For Work - content inappropriate for workplace environments</p>
+                    </div>
+                    
+                    <div class="glossary-term">
+                        <h6>Confidence Score</h6>
+                        <p class="small text-muted">AI model's certainty in its prediction, ranging from 0.0 to 1.0</p>
+                    </div>
+                    
+                    <div class="glossary-term">
+                        <h6>Florence-2</h6>
+                        <p class="small text-muted">Microsoft's vision-language model for detailed image captioning</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="glossary-term">
+                        <h6>CLIP</h6>
+                        <p class="small text-muted">OpenAI's model for understanding relationships between images and text</p>
+                    </div>
+                    
+                    <div class="glossary-term">
+                        <h6>Risk Level</h6>
+                        <p class="small text-muted">Overall assessment of content appropriateness (High, Medium, Low)</p>
+                    </div>
+                    
+                    <div class="glossary-term">
+                        <h6>Semantic Analysis</h6>
+                        <p class="small text-muted">Understanding the meaning and context of text content</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate progress ring
+    const progressRing = document.querySelector('.progress-ring__meter');
+    if (progressRing) {
+        const confidence = {{ result.overall_confidence }};
+        const circumference = 2 * Math.PI * 52;
+        const offset = circumference - (confidence * circumference);
+        
+        progressRing.style.strokeDasharray = circumference;
+        progressRing.style.strokeDashoffset = circumference;
+        
+        setTimeout(() => {
+            progressRing.style.strokeDashoffset = offset;
+        }, 500);
+    }
+    
+    // Print optimization
+    window.addEventListener('beforeprint', function() {
+        document.body.classList.add('printing');
+    });
+    
+    window.addEventListener('afterprint', function() {
+        document.body.classList.remove('printing');
+    });
+});
+</script>
+{% endblock %}

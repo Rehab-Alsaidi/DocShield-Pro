@@ -1,0 +1,357 @@
+# config/model_configs.yaml
+# AI Model Configurations for PDF Content Moderator
+
+# Global settings
+global:
+  device: "auto"  # auto, cuda, cpu, mps
+  precision: "float16"  # float32, float16, bfloat16
+  cache_dir: "./model_cache"
+  batch_size: 8
+  max_memory_usage: "8GB"
+  enable_model_parallelism: false
+  
+# Florence-2 Configuration
+florence2:
+  model_name: "microsoft/Florence-2-base"
+  model_variants:
+    base: "microsoft/Florence-2-base"
+    large: "microsoft/Florence-2-large"
+  
+  default_config:
+    task_prompt: "<CAPTION>"
+    max_new_tokens: 1024
+    num_beams: 3
+    do_sample: false
+    torch_dtype: "float32"
+    trust_remote_code: true
+    device_map: null
+    attn_implementation: "eager"
+  
+  performance_settings:
+    image_preprocessing:
+      max_size: 1024
+      resize_method: "LANCZOS"
+      normalize: true
+    
+    generation_params:
+      use_cache: true
+      pad_token_id: null  # Will use tokenizer default
+      eos_token_id: null  # Will use tokenizer default
+      early_stopping: true
+    
+    optimization:
+      compile_model: false  # Requires PyTorch 2.0+
+      use_bettertransformer: false
+      gradient_checkpointing: false
+  
+  quality_thresholds:
+    min_caption_length: 5
+    max_caption_length: 500
+    confidence_threshold: 0.3
+    
+# CLIP Configuration  
+clip:
+  model_name: "openai/clip-vit-base-patch32"
+  model_variants:
+    base: "openai/clip-vit-base-patch32"
+    large: "openai/clip-vit-large-patch14"
+    
+  default_config:
+    image_size: 224
+    batch_size: 16
+    similarity_threshold: 0.3
+    
+  content_categories:
+    high_risk:
+      - "adult content"
+      - "explicit content" 
+      - "sexual content"
+      - "nude person"
+      - "violence"
+      - "fighting"
+      - "weapon"
+      - "gun"
+      - "knife"
+      - "blood"
+    
+    medium_risk:
+      - "revealing clothing"
+      - "intimate scene"
+      - "suggestive pose"
+      - "alcohol"
+      - "drinking"
+      - "gambling"
+      - "casino"
+      - "poker game"
+      - "inappropriate content"
+    
+    low_risk:
+      - "religious content"
+      - "church"
+      - "mosque" 
+      - "temple"
+      - "romantic scene"
+      - "kissing"
+      - "couple"
+      - "wedding"
+      - "christmas"
+      - "halloween"
+    
+    safe_content:
+      - "business meeting"
+      - "office"
+      - "education"
+      - "family"
+      - "children playing"
+      - "nature"
+      - "food"
+      - "sports"
+      - "technology"
+      - "art"
+  
+  performance_settings:
+    preprocessing:
+      resize_method: "LANCZOS"
+      center_crop: true
+      normalize: true
+    
+    inference:
+      use_fp16: true
+      enable_attention_slicing: false
+      enable_cpu_offload: false
+
+# NSFW Detection Configuration
+nsfw_detection:
+  model_name: "Falconsai/nsfw_image_detection"
+  alternative_models:
+    - "michelecafagna26/nsfw-age-detection"
+    - "AdamCodd/vit-base-nsfw-detector"
+  
+  default_config:
+    threshold: 0.5
+    confidence_threshold: 0.7
+    image_size: [224, 224]
+    
+  categories:
+    safe: "safe"
+    nsfw: "nsfw"
+    explicit: "explicit"
+    suggestive: "suggestive"
+    
+  severity_mapping:
+    safe: "safe"
+    nsfw: "high" 
+    explicit: "high"
+    suggestive: "medium"
+    questionable: "low"
+    
+  performance_settings:
+    batch_processing: true
+    async_inference: false
+    model_quantization: false
+
+# NLP Models Configuration
+nlp:
+  sentence_transformers:
+    model_name: "all-MiniLM-L6-v2"
+    alternatives:
+      - "all-mpnet-base-v2"
+      - "paraphrase-multilingual-MiniLM-L12-v2"
+    
+    config:
+      device: "auto"
+      normalize_embeddings: true
+      batch_size: 32
+      max_seq_length: 384
+      
+  spacy:
+    model_name: "en_core_web_sm"
+    alternatives:
+      - "en_core_web_md"
+      - "en_core_web_lg"
+    
+    config:
+      disable: ["parser", "tagger"]  # Keep only needed components
+      enable: ["ner", "tok2vec"]
+      
+  text_analysis:
+    min_text_length: 10
+    max_text_length: 10000
+    language_detection: true
+    sentiment_analysis: true
+    
+# Model Loading Strategy
+loading_strategy:
+  lazy_loading: true  # Load models only when needed
+  preload_models: ["florence2"]  # Models to load at startup
+  model_timeout: 300  # Seconds before unloading unused models
+  memory_threshold: 0.8  # Unload models if memory usage > 80%
+  
+  concurrent_models: 2  # Max models loaded simultaneously
+  model_priority:
+    1: "florence2"
+    2: "clip" 
+    3: "nsfw_detection"
+    4: "nlp"
+
+# Performance Optimization
+optimization:
+  mixed_precision: true
+  gradient_accumulation: false
+  model_compilation: false  # PyTorch 2.0 compile
+  
+  memory_management:
+    clear_cache_after_batch: true
+    gpu_memory_fraction: 0.9
+    allow_growth: true
+    
+  parallel_processing:
+    enable_multiprocessing: false
+    num_workers: 2
+    prefetch_factor: 2
+
+# Monitoring and Logging
+monitoring:
+  track_inference_time: true
+  track_memory_usage: true
+  track_model_accuracy: false
+  
+  performance_logging:
+    log_slow_inferences: true
+    slow_inference_threshold: 10.0  # seconds
+    
+  metrics_collection:
+    enable_prometheus: false
+    metrics_port: 9090
+    
+# Error Handling
+error_handling:
+  max_retries: 3
+  retry_delay: 1.0  # seconds
+  timeout_strategy: "graceful_degradation"
+  fallback_enabled: true
+  
+  model_failure_actions:
+    florence2: "skip_image_analysis"
+    clip: "use_keyword_fallback" 
+    nsfw_detection: "conservative_classification"
+    nlp: "basic_keyword_matching"
+
+# Development and Testing
+development:
+  mock_models: false  # Use mock models for testing
+  benchmark_mode: false
+  debug_output: false
+  save_intermediate_results: false
+  
+  test_configurations:
+    unit_tests:
+      use_dummy_models: true
+      small_test_images: true
+      
+    integration_tests:
+      use_real_models: true
+      benchmark_performance: true
+      
+    load_tests:
+      concurrent_requests: 10
+      test_duration: 300  # seconds
+
+# Model Update and Versioning
+model_management:
+  auto_update: false
+  update_frequency: "monthly"
+  backup_old_models: true
+  
+  version_control:
+    track_model_versions: true
+    rollback_enabled: true
+    
+  model_registry:
+    remote_registry: null
+    local_cache: true
+    cache_size_limit: "20GB"
+
+# Security Settings
+security:
+  model_integrity_check: true
+  trusted_sources_only: true
+  sandbox_model_loading: false
+  
+  allowed_model_sources:
+    - "huggingface.co"
+    - "microsoft.com"
+    - "openai.com"
+    
+# Regional and Cultural Settings  
+cultural_adaptation:
+  default_region: "global"
+  
+  regional_configs:
+    middle_east:
+      enhanced_sensitivity:
+        - "religious_content"
+        - "cultural_symbols"
+        - "traditional_clothing"
+      
+      adjusted_thresholds:
+        religious_content: 0.3
+        cultural_symbols: 0.4
+        
+    western:
+      standard_sensitivity: true
+      
+    conservative:
+      enhanced_sensitivity:
+        - "romantic_content"
+        - "alcohol_content"
+        - "revealing_clothing"
+      
+      adjusted_thresholds:
+        romantic_content: 0.2
+        alcohol_content: 0.3
+
+# Deployment Configurations
+deployment:
+  production:
+    device: "cuda"
+    batch_size: 16
+    num_workers: 4
+    enable_monitoring: true
+    
+  development:
+    device: "cpu"
+    batch_size: 4
+    num_workers: 1
+    debug_mode: true
+    
+  testing:
+    device: "cpu"
+    batch_size: 2
+    mock_expensive_models: true
+    
+# Resource Limits
+resource_limits:
+  max_gpu_memory: "8GB"
+  max_cpu_cores: 8
+  max_inference_time: 60  # seconds per request
+  max_batch_size: 32
+  max_concurrent_requests: 10
+
+# Model Health Checks
+health_checks:
+  enabled: true
+  interval: 300  # seconds
+  
+  checks:
+    model_responsiveness:
+      timeout: 30
+      test_input_size: [224, 224, 3]
+      
+    memory_usage:
+      max_threshold: 0.9
+      warning_threshold: 0.7
+      
+    inference_speed:
+      max_time: 10  # seconds
+      warning_time: 5

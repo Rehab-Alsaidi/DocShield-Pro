@@ -1,0 +1,356 @@
+{
+  "content_moderation_rules": {
+    "version": "1.0.0",
+    "last_updated": "2024-01-15",
+    "description": "Content moderation rules for PDF analysis system",
+    
+    "high_risk": {
+      "adult_content": {
+        "category": "adult_content",
+        "severity": "high",
+        "confidence_threshold": 0.8,
+        "keywords": [
+          "nude", "naked", "explicit", "sexual", "intimate", "adult content",
+          "pornographic", "erotic", "xxx", "nsfw", "suggestive pose",
+          "revealing clothing", "underwear", "lingerie", "bikini",
+          "sexual activity", "intimate scene", "adult material"
+        ],
+        "semantic_patterns": [
+          "explicit sexual content",
+          "nude human body",
+          "adult intimate scene",
+          "sexual activity depiction"
+        ],
+        "description": "Content containing explicit adult material or nudity"
+      },
+      
+      "violence": {
+        "category": "violence",
+        "severity": "high", 
+        "confidence_threshold": 0.75,
+        "keywords": [
+          "violence", "violent", "fighting", "fight", "weapon", "weapons",
+          "gun", "guns", "knife", "knives", "sword", "blood", "bloody",
+          "murder", "kill", "killing", "death", "war", "battle", "assault",
+          "attack", "aggression", "brutality", "torture", "harm"
+        ],
+        "semantic_patterns": [
+          "violent confrontation",
+          "weapon being used",
+          "physical aggression", 
+          "blood or injury",
+          "war or battle scene"
+        ],
+        "description": "Content depicting violence, weapons, or harmful activities"
+      },
+      
+      "illegal_substances": {
+        "category": "illegal_substances",
+        "severity": "high",
+        "confidence_threshold": 0.8,
+        "keywords": [
+          "drugs", "cocaine", "heroin", "marijuana", "cannabis", "meth",
+          "methamphetamine", "pills", "substance abuse", "drug use",
+          "narcotic", "illegal drugs", "drug dealing", "drug trade",
+          "overdose", "addiction", "recreational drugs"
+        ],
+        "semantic_patterns": [
+          "illegal drug use",
+          "drug paraphernalia",
+          "substance abuse scene",
+          "drug dealing activity"
+        ],
+        "description": "Content related to illegal drugs or substance abuse"
+      }
+    },
+    
+    "medium_risk": {
+      "alcohol_content": {
+        "category": "alcohol_content",
+        "severity": "medium",
+        "confidence_threshold": 0.6,
+        "keywords": [
+          "alcohol", "alcoholic", "beer", "wine", "whiskey", "vodka",
+          "drinking", "drunk", "intoxicated", "bar", "pub", "nightclub",
+          "cocktail", "liquor", "spirits", "champagne", "brewery",
+          "distillery", "alcohol consumption", "alcoholic beverage"
+        ],
+        "semantic_patterns": [
+          "people drinking alcohol",
+          "alcoholic beverages visible",
+          "bar or pub setting",
+          "alcohol consumption scene"
+        ],
+        "description": "Content featuring alcohol consumption or alcoholic beverages"
+      },
+      
+      "gambling": {
+        "category": "gambling",
+        "severity": "medium",
+        "confidence_threshold": 0.7,
+        "keywords": [
+          "gambling", "casino", "bet", "betting", "poker", "blackjack",
+          "roulette", "slot machine", "dice", "cards", "lottery",
+          "wagering", "gaming", "jackpot", "casino chips", "gambling table"
+        ],
+        "semantic_patterns": [
+          "casino gaming table",
+          "gambling activity",
+          "betting scene",
+          "casino environment"
+        ],
+        "description": "Content related to gambling or casino activities"
+      },
+      
+      "inappropriate_content": {
+        "category": "inappropriate_content", 
+        "severity": "medium",
+        "confidence_threshold": 0.6,
+        "keywords": [
+          "inappropriate", "suggestive", "revealing", "scandalous",
+          "provocative", "indecent", "improper", "offensive",
+          "questionable", "controversial", "sensitive material"
+        ],
+        "semantic_patterns": [
+          "suggestive content",
+          "inappropriate behavior",
+          "controversial material",
+          "potentially offensive content"
+        ],
+        "description": "Content that may be considered inappropriate or offensive"
+      },
+      
+      "profanity": {
+        "category": "profanity",
+        "severity": "medium", 
+        "confidence_threshold": 0.5,
+        "keywords": [
+          "profanity", "swearing", "curse words", "offensive language",
+          "vulgar", "obscene", "inappropriate language", "bad language",
+          "foul language", "expletive", "blasphemy"
+        ],
+        "semantic_patterns": [
+          "offensive language use",
+          "profane expression",
+          "vulgar content",
+          "inappropriate speech"
+        ],
+        "description": "Content containing profanity or offensive language"
+      }
+    },
+    
+    "low_risk": {
+      "religious_content": {
+        "category": "religious_content",
+        "severity": "low",
+        "confidence_threshold": 0.5,
+        "keywords": [
+          "religion", "religious", "church", "mosque", "temple", "synagogue",
+          "prayer", "worship", "faith", "belief", "spiritual", "holy",
+          "sacred", "divine", "god", "allah", "jesus", "buddha",
+          "cross", "crucifix", "religious symbol", "religious ceremony"
+        ],
+        "semantic_patterns": [
+          "religious building",
+          "religious ceremony",
+          "religious symbol",
+          "worship activity"
+        ],
+        "description": "Content featuring religious themes, symbols, or activities"
+      },
+      
+      "dating_romance": {
+        "category": "dating_romance", 
+        "severity": "low",
+        "confidence_threshold": 0.5,
+        "keywords": [
+          "dating", "romance", "romantic", "love", "couple", "relationship",
+          "kissing", "hugging", "wedding", "marriage", "engagement",
+          "valentine", "anniversary", "romantic dinner", "date night"
+        ],
+        "semantic_patterns": [
+          "romantic couple",
+          "dating scene", 
+          "romantic activity",
+          "wedding ceremony"
+        ],
+        "description": "Content related to dating, romance, or relationships"
+      },
+      
+      "western_holidays": {
+        "category": "western_holidays",
+        "severity": "low",
+        "confidence_threshold": 0.6,
+        "keywords": [
+          "christmas", "easter", "halloween", "valentine's day", "thanksgiving",
+          "new year", "santa claus", "easter bunny", "christmas tree",
+          "halloween costume", "valentine gift", "turkey dinner",
+          "holiday celebration", "festive", "seasonal"
+        ],
+        "semantic_patterns": [
+          "christmas celebration",
+          "halloween activity",
+          "easter celebration", 
+          "valentine's day theme",
+          "western holiday tradition"
+        ],
+        "description": "Content featuring Western holidays and celebrations"
+      },
+      
+      "political_content": {
+        "category": "political_content",
+        "severity": "low",
+        "confidence_threshold": 0.6,
+        "keywords": [
+          "politics", "political", "government", "election", "voting",
+          "democracy", "politician", "president", "congress", "parliament",
+          "political party", "campaign", "policy", "legislation"
+        ],
+        "semantic_patterns": [
+          "political figure",
+          "government building",
+          "election activity",
+          "political event"
+        ],
+        "description": "Content related to politics or government"
+      }
+    },
+    
+    "contextual_rules": {
+      "image_context": {
+        "large_crowd_events": {
+          "description": "Large gatherings that might be protests or political events",
+          "triggers": ["crowd", "gathering", "protest", "demonstration", "rally"],
+          "severity": "low",
+          "confidence_threshold": 0.4
+        },
+        
+        "educational_content": {
+          "description": "Educational or academic content that should be treated more leniently", 
+          "triggers": ["classroom", "school", "education", "learning", "academic", "textbook"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.7
+        },
+        
+        "medical_content": {
+          "description": "Medical or health-related content that may show human body",
+          "triggers": ["medical", "health", "anatomy", "surgery", "hospital", "doctor"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.6
+        },
+        
+        "artistic_content": {
+          "description": "Artistic content that may contain nudity in classical art context",
+          "triggers": ["art", "sculpture", "painting", "museum", "gallery", "artistic"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.8
+        }
+      },
+      
+      "text_context": {
+        "news_reporting": {
+          "description": "News articles discussing sensitive topics objectively",
+          "triggers": ["news", "report", "journalist", "breaking news", "according to"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.6
+        },
+        
+        "academic_discussion": {
+          "description": "Academic or scholarly discussion of sensitive topics",
+          "triggers": ["research", "study", "analysis", "academic", "scholar", "university"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.7
+        },
+        
+        "historical_content": {
+          "description": "Historical documentation or discussion",
+          "triggers": ["history", "historical", "ancient", "centuries ago", "in the past"],
+          "severity_modifier": -1,
+          "confidence_threshold": 0.6
+        }
+      }
+    },
+    
+    "exemptions": {
+      "safe_categories": [
+        "business", "technology", "science", "nature", "food", "sports",
+        "travel", "family", "children", "pets", "architecture", "landscape"
+      ],
+      
+      "educational_exemptions": {
+        "anatomy_education": {
+          "description": "Educational anatomy content",
+          "keywords": ["anatomy", "medical education", "biology", "physiology"],
+          "severity_override": "safe"
+        },
+        
+        "health_education": {
+          "description": "Health and wellness education",
+          "keywords": ["health education", "wellness", "fitness", "nutrition"],
+          "severity_override": "safe"
+        }
+      }
+    },
+    
+    "processing_rules": {
+      "confidence_adjustments": {
+        "high_quality_image": {
+          "condition": "image_quality > 0.8",
+          "confidence_boost": 0.1
+        },
+        
+        "low_quality_image": {
+          "condition": "image_quality < 0.3", 
+          "confidence_penalty": 0.2
+        },
+        
+        "multiple_violations": {
+          "condition": "violation_count > 3",
+          "severity_escalation": true
+        }
+      },
+      
+      "thresholds": {
+        "minimum_text_length": 10,
+        "minimum_image_size": 50,
+        "maximum_processing_time": 300,
+        "batch_size_limit": 100
+      }
+    },
+    
+    "reporting": {
+      "violation_categories": {
+        "critical": ["adult_content", "violence", "illegal_substances"],
+        "warning": ["alcohol_content", "gambling", "inappropriate_content"],
+        "notice": ["religious_content", "dating_romance", "western_holidays"],
+        "info": ["political_content"]
+      },
+      
+      "escalation_rules": {
+        "immediate_review": {
+          "conditions": ["severity == high", "confidence > 0.9"],
+          "action": "flag_for_immediate_review"
+        },
+        
+        "manual_review": {
+          "conditions": ["severity == high", "confidence > 0.7"],
+          "action": "queue_for_manual_review"
+        },
+        
+        "automatic_action": {
+          "conditions": ["severity == medium", "confidence > 0.8"],
+          "action": "apply_content_warning"
+        }
+      }
+    }
+  },
+  
+  "metadata": {
+    "rule_count": 45,
+    "categories": 12,
+    "last_validation": "2024-01-15T10:00:00Z",
+    "schema_version": "1.0",
+    "maintainer": "Content Moderation Team",
+    "review_frequency": "monthly"
+  }
+}

@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}Security Report - DocShield Pro{% endblock %}
+
+{% block content %}
+<div class="bg-white min-h-screen">
+    <!-- Results Header -->
+    <div class="bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="mb-6">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full mb-4">
+                    <i class="fas fa-check-circle text-white text-2xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Security Analysis Complete</h1>
+                <p class="text-lg text-gray-600">
+                    Document: <span class="font-semibold text-blue-600">{{ result.file_name or 'Unknown Document' }}</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="py-12">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                <!-- Risk Level -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-center">
+                    <div class="text-4xl mb-4 {% if result.overall_risk_level == 'high' %}text-red-500{% elif result.overall_risk_level == 'medium' %}text-yellow-500{% else %}text-green-500{% endif %}">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Threat Level</h3>
+                    <p class="text-2xl font-bold {% if result.overall_risk_level == 'high' %}text-red-600{% elif result.overall_risk_level == 'medium' %}text-yellow-600{% else %}text-green-600{% endif %}">
+                        {{ (result.overall_risk_level or 'unknown')|title }}
+                    </p>
+                </div>
+
+                <!-- Total Violations -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-center">
+                    <div class="text-4xl text-red-500 mb-4">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Security Alerts</h3>
+                    <p class="text-2xl font-bold text-gray-900">{{ result.total_violations or result.violations|length or 0 }}</p>
+                </div>
+
+                <!-- Processing Status -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-center">
+                    <div class="text-4xl text-green-500 mb-4">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Status</h3>
+                    <p class="text-lg font-bold text-green-600">Complete</p>
+                </div>
+
+                <!-- Analysis Quality -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-center">
+                    <div class="text-4xl mb-4">
+                        <i class="fas fa-chart-line text-blue-500"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Analysis Quality</h3>
+                    <p class="text-2xl font-bold text-blue-600">
+                        {% if (result.overall_confidence or 0) > 0.8 %}EXCELLENT{% elif (result.overall_confidence or 0) > 0.6 %}GOOD{% else %}COMPLETED{% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Enhanced Analysis Info (if available) -->
+            {% if result.enhancement_info %}
+            <div class="mb-8">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div class="bg-white rounded-lg p-3 text-center border border-green-200">
+                            <div class="text-lg font-bold text-green-600">{{ result.total_images or result.image_results|length or 0 }}</div>
+                            <div class="text-xs text-gray-600">Images Analyzed</div>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 text-center border border-green-200">
+                            <div class="text-lg font-bold text-red-600">{{ result.total_violations or result.violations|length or 0 }}</div>
+                            <div class="text-xs text-gray-600">Violations Found</div>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 text-center border border-green-200">
+                            <div class="text-lg font-bold text-blue-600">4</div>
+                            <div class="text-xs text-gray-600">AI Models Used</div>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 text-center border border-green-200">
+                            <div class="text-lg font-bold text-purple-600">{{ result.overall_risk_level|title or 'Low' }}</div>
+                            <div class="text-xs text-gray-600">Risk Level</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- All Images Analysis Section -->
+            {% if result.image_results %}
+            <div class="mb-8">
+                <!-- Flagged Images -->
+                {% set flagged_images = [] %}
+                {% set safe_images = [] %}
+                {% set processed_indices = [] %}
+                
+                {% if result.smart_image_analysis %}
+                    {% for smart_analysis in result.smart_image_analysis %}
+                        {% set img_idx = smart_analysis.image_index %}
+                        {% if img_idx not in processed_indices %}
+                            {% if processed_indices.append(img_idx) %}{% endif %}
+                            {% if img_idx < result.image_results|length %}
+                                {% set image = result.image_results[img_idx] %}
+                                {% if smart_analysis.smart_analysis.is_violation %}
+                                    {% if flagged_images.append({'image': image, 'analysis': smart_analysis, 'index': img_idx}) %}{% endif %}
+                                {% else %}
+                                    {% if safe_images.append({'image': image, 'analysis': smart_analysis, 'index': img_idx}) %}{% endif %}
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    {% for image in result.image_results %}
+                        {% if image.violations %}
+                            {% if flagged_images.append({'image': image, 'analysis': None, 'index': loop.index0}) %}{% endif %}
+                        {% else %}
+                            {% if safe_images.append({'image': image, 'analysis': None, 'index': loop.index0}) %}{% endif %}
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if flagged_images %}
+                <div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+                    <h2 class="text-xl font-bold text-red-800 mb-4 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-3"></i>
+                        Inappropriate Content Detected ({{ flagged_images|length }})
+                    </h2>
+                    <p class="text-red-700 mb-4">The following images were flagged as inappropriate according to Islamic principles:</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% for item in flagged_images %}
+                        <div class="bg-white border border-red-300 rounded-lg p-4">
+                            <div class="mb-3">
+                                <img src="{{ item.image.image_base64 }}" alt="Flagged content" class="w-full h-32 object-cover rounded blur-sm hover:blur-none transition-all cursor-pointer" title="Click to view (content warning)">
+                            </div>
+                            <!-- Model Caption -->
+                            {% if item.image.caption %}
+                            <div class="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                                <h6 class="font-semibold text-blue-800 text-xs mb-1 flex items-center">
+                                    <i class="fas fa-robot mr-1"></i>AI Model Caption:
+                                </h6>
+                                <p class="text-xs text-blue-700 italic">"{{ item.image.caption }}"</p>
+                            </div>
+                            {% endif %}
+                            <div class="text-sm">
+                                <p class="font-semibold text-red-800">Image {{ item.index + 1 }} - Page {{ item.image.page_number or 'N/A' }}</p>
+                                {% if item.analysis %}
+                                    {% set reasoning = item.analysis.smart_analysis.reasoning %}
+                                    {% if 'Mixed gender content detected:' in reasoning %}
+                                        <p class="text-red-600">Mixed gender content detected</p>
+                                    {% elif 'Inappropriate clothing detected:' in reasoning %}
+                                        <p class="text-red-600">Inappropriate clothing detected</p>
+                                    {% else %}
+                                        <p class="text-red-600">{{ reasoning.split(':')[0] if ':' in reasoning else reasoning }}</p>
+                                    {% endif %}
+                                    <p class="text-red-500 text-xs mt-1">{{ "%.0f"|format(item.analysis.smart_analysis.confidence * 100) }}% confidence</p>
+                                {% else %}
+                                    <p class="text-red-600">{{ item.image.violations[0].description if item.image.violations else 'Inappropriate content' }}</p>
+                                    <p class="text-red-500 text-xs mt-1">{{ item.image.violations[0].category if item.image.violations else '' }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-4 p-4 bg-red-100 rounded-lg">
+                        <p class="text-red-800 font-semibold mb-2">🕌 Islamic Guidance:</p>
+                        <p class="text-red-700 text-sm">Content should align with Islamic teachings on modesty and appropriate imagery. Please review and remove any content that may conflict with religious values.</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Safe Images -->
+                {% if safe_images %}
+                <div class="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <h2 class="text-xl font-bold text-green-800 mb-4 flex items-center">
+                        <i class="fas fa-check-circle mr-3"></i>
+                        Acceptable Content ({{ safe_images|length }})
+                    </h2>
+                    <p class="text-green-700 mb-4">The following images passed Islamic content standards:</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% for item in safe_images %}
+                        <div class="bg-white border border-green-300 rounded-lg p-4">
+                            <div class="mb-3">
+                                <img src="{{ item.image.image_base64 }}" alt="Safe content" class="w-full h-32 object-cover rounded">
+                            </div>
+                            <!-- Model Caption -->
+                            {% if item.image.caption %}
+                            <div class="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                                <h6 class="font-semibold text-blue-800 text-xs mb-1 flex items-center">
+                                    <i class="fas fa-robot mr-1"></i>AI Model Caption:
+                                </h6>
+                                <p class="text-xs text-blue-700 italic">"{{ item.image.caption }}"</p>
+                            </div>
+                            {% endif %}
+                            <div class="text-sm">
+                                <p class="font-semibold text-green-800">Image {{ item.index + 1 }} - Page {{ item.image.page_number or 'N/A' }}</p>
+                                {% if item.analysis %}
+                                    <p class="text-green-600">Content approved</p>
+                                    <p class="text-green-500 text-xs mt-1">Islamic compliant</p>
+                                {% else %}
+                                    <p class="text-green-600">Content approved</p>
+                                    <p class="text-green-500 text-xs mt-1">Islamic compliant</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Detected Words Analysis Section -->
+            <div class="mb-8">
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <div class="bg-gradient-to-r from-green-50 to-blue-50 px-8 py-6 border-b border-gray-200">
+                        <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                            <i class="fas fa-search mr-3 text-green-600"></i>
+                            Detected Words Analysis
+                        </h2>
+                        <p class="text-gray-700 mt-2">Analysis of text content for problematic keywords</p>
+                    </div>
+                    
+                    <div class="p-8">
+                        {% set text_violations = result.violations|selectattr('violation_type', 'equalto', 'text')|list if result.violations else [] %}
+                        {% set all_detected_words = [] %}
+                        {% for violation in text_violations %}
+                            {% if violation.evidence and violation.evidence.keyword %}
+                                {% set _ = all_detected_words.append({
+                                    'word': violation.evidence.keyword,
+                                    'category': violation.category,
+                                    'severity': violation.severity,
+                                    'page': violation.page_number,
+                                    'count': violation.evidence.count if violation.evidence.count else 1
+                                }) %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-blue-800 mb-4 flex items-center">
+                                <i class="fas fa-search mr-3"></i>
+                                Text Analysis Results
+                            </h3>
+                        
+                            {% if all_detected_words %}
+                            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6">
+                                <div class="mb-4">
+                                    <h4 class="font-bold text-red-800 mb-3 flex items-center">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        Flagged Keywords Found in Document ({{ all_detected_words|length }} words):
+                                    </h4>
+                                    <div class="flex flex-wrap gap-2 mb-4">
+                                        {% for word_info in all_detected_words %}
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800 border border-red-300" title="Category: {{ word_info.category }}, Severity: {{ word_info.severity }}, Page: {{ word_info.page }}">
+                                            {{ word_info.word }}
+                                            {% if word_info.count > 1 %}
+                                            <span class="ml-1 bg-red-600 text-white text-xs rounded-full px-1">{{ word_info.count }}</span>
+                                            {% endif %}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-white p-4 rounded-lg border border-red-200">
+                                        <h5 class="font-semibold text-red-800 mb-2 flex items-center">
+                                            <i class="fas fa-chart-bar mr-2"></i>
+                                            Word Categories:
+                                        </h5>
+                                        <div class="space-y-1">
+                                            {% set category_counts = {} %}
+                                            {% for word_info in all_detected_words %}
+                                                {% set category = word_info.category %}
+                                                {% if category in category_counts %}
+                                                    {% set _ = category_counts.update({category: category_counts[category] + 1}) %}
+                                                {% else %}
+                                                    {% set _ = category_counts.update({category: 1}) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for category, count in category_counts.items() %}
+                                            <div class="flex justify-between text-sm">
+                                                <span class="text-gray-700">{{ category|title }}</span>
+                                                <span class="font-medium text-red-600">{{ count }} word{{ 's' if count > 1 else '' }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="bg-white p-4 rounded-lg border border-red-200">
+                                        <h5 class="font-semibold text-red-800 mb-2 flex items-center">
+                                            <i class="fas fa-map-marker-alt mr-2"></i>
+                                            Page Distribution:
+                                        </h5>
+                                        <div class="space-y-1">
+                                            {% set page_counts = {} %}
+                                            {% for word_info in all_detected_words %}
+                                                {% set page = word_info.page %}
+                                                {% if page in page_counts %}
+                                                    {% set _ = page_counts.update({page: page_counts[page] + 1}) %}
+                                                {% else %}
+                                                    {% set _ = page_counts.update({page: 1}) %}
+                                                {% endif %}
+                                            {% endfor %}
+                                            {% for page, count in page_counts.items() %}
+                                            <div class="flex justify-between text-sm">
+                                                <span class="text-gray-700">Page {{ page }}</span>
+                                                <span class="font-medium text-red-600">{{ count }} word{{ 's' if count > 1 else '' }}</span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <p class="text-yellow-800 text-sm flex items-center">
+                                        <i class="fas fa-lightbulb mr-2"></i>
+                                        <strong>Action Required:</strong> Review and replace these flagged words with culturally appropriate alternatives.
+                                    </p>
+                                </div>
+                            </div>
+                            {% else %}
+                            <!-- No Words Detected Fallback -->
+                            <div class="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6 text-center">
+                                <i class="fas fa-check-circle text-green-500 text-4xl mb-3"></i>
+                                <h4 class="font-bold text-green-800 mb-2">No problematic words detected</h4>
+                                <p class="text-green-700 text-sm">The document's text content appears to be compliant with cultural standards and guidelines.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Analysis Summary -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-clipboard-list mr-2 text-blue-500"></i>
+                        Analysis Summary
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Document ID:</span>
+                            <span class="font-mono text-sm text-gray-900">{{ result.document_id or result.file_id or 'N/A' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Processed:</span>
+                            <span class="text-gray-900">{{ result.processing_timestamp or result.processed_at or 'Just now' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Total Pages:</span>
+                            <span class="text-gray-900">{{ result.total_pages or 'N/A' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                            <span class="text-gray-600">Images Analyzed:</span>
+                            <span class="text-gray-900">{{ result.total_images or result.image_results|length or 0 }}</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-gray-600">Processing Time:</span>
+                            <span class="text-gray-900">{{ result.processing_metadata.processing_time_seconds if result.processing_metadata else 'N/A' }}s</span>
+                        </div>
+                    </div>
+
+                    {% if result.message %}
+                    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p class="text-blue-700">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            {{ result.message }}
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- AI Models Used -->
+                <div class="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-robot mr-2 text-purple-500"></i>
+                        AI Models Used
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        {% set models_used = result.processing_metadata.models_used if result.processing_metadata else ['BLIP', 'CLIP', 'NSFW-Detector', 'Florence-2'] %}
+                        {% for model in models_used %}
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                {% if 'CLIP' in model %}
+                                <i class="fas fa-eye text-green-500 mr-3"></i>
+                                {% elif 'NSFW' in model %}
+                                <i class="fas fa-shield-alt text-red-500 mr-3"></i>
+                                {% elif 'NLP' in model or 'Transformer' in model %}
+                                <i class="fas fa-language text-blue-500 mr-3"></i>
+                                {% elif 'Florence' in model %}
+                                <i class="fas fa-robot text-purple-500 mr-3"></i>
+                                {% else %}
+                                <i class="fas fa-cog text-gray-500 mr-3"></i>
+                                {% endif %}
+                                <span class="font-medium text-gray-900">{{ model }}</span>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if 'Florence' in model %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                {% if 'Florence' in model %}Offline{% else %}Active{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Violations Section -->
+            {% if result.violations and result.violations|length > 0 %}
+            <div class="mt-8 bg-white rounded-lg shadow-md border border-gray-200">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-900">
+                        <i class="fas fa-flag mr-2 text-red-500"></i>
+                        Content Issues Detected ({{ result.violations|length }})
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Page</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for violation in result.violations[:10] %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ violation.page_number or 'N/A' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {% if violation.violation_type == 'image' %}
+                                        <i class="fas fa-image mr-1 text-blue-500"></i>
+                                        {% elif violation.violation_type == 'text' %}
+                                        <i class="fas fa-file-text mr-1 text-green-500"></i>
+                                        {% else %}
+                                        <i class="fas fa-exclamation mr-1 text-gray-500"></i>
+                                        {% endif %}
+                                        {{ violation.violation_type|title or 'Unknown' }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if violation.severity == 'high' %}bg-red-100 text-red-800{% elif violation.severity == 'medium' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                            {{ violation.severity|title or 'Low' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ violation.category or 'General' }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">{{ violation.description or 'No description available' }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ "%.2f"|format(violation.confidence or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if result.violations|length > 10 %}
+                    <div class="mt-4 text-center">
+                        <p class="text-gray-600">Showing first 10 of {{ result.violations|length }} issues. Download the full report for complete details.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="mt-8 bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <div class="text-center">
+                    <div class="text-6xl text-green-500 mb-4">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">No Issues Detected</h3>
+                    <p class="text-gray-600">
+                        The document passed all content moderation checks. No policy violations or inappropriate content was found.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="mt-8 bg-white rounded-lg shadow-md border border-gray-200 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-6 text-center">Next Steps</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Download Report -->
+                    <a href="{{ url_for('download_report', result_id=result_id) }}" 
+                       class="flex items-center justify-center px-6 py-4 border border-transparent text-base font-medium rounded-lg text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transition-all duration-200 transform hover:scale-105">
+                        <i class="fas fa-download mr-3"></i>
+                        Download PDF Report
+                    </a>
+                    
+                    <!-- Share Results -->
+                    <button onclick="shareResults()" 
+                            class="flex items-center justify-center px-6 py-4 border border-blue-300 text-base font-medium rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 transition-all duration-200 transform hover:scale-105">
+                        <i class="fas fa-share-alt mr-3"></i>
+                        Share Results
+                    </button>
+                    
+                    <!-- Analyze Another -->
+                    <a href="{{ url_for('index') }}" 
+                       class="flex items-center justify-center px-6 py-4 border border-gray-300 text-base font-medium rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all duration-200 transform hover:scale-105">
+                        <i class="fas fa-plus mr-3"></i>
+                        Analyze Another PDF
+                    </a>
+                </div>
+                
+                <!-- Additional Options -->
+                <div class="mt-6 flex justify-center space-x-4">
+                    <button onclick="exportToCSV()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        <i class="fas fa-file-csv mr-1"></i>Export to CSV
+                    </button>
+                    <button onclick="viewTechnicalDetails()" class="text-sm text-gray-600 hover:text-gray-800 font-medium">
+                        <i class="fas fa-info-circle mr-1"></i>Technical Details
+                    </button>
+                </div>
+            </div>
+
+            <!-- Technical Details (Hidden by default) -->
+            <div id="technicalDetails" class="hidden mt-8 bg-gray-50 rounded-lg border border-gray-200 p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Technical Analysis Details</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Processing Information</h4>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="text-gray-600">Result ID:</span> {{ result_id }}</p>
+                            <p><span class="text-gray-600">Document ID:</span> {{ result.document_id or result.file_id or 'N/A' }}</p>
+                            <p><span class="text-gray-600">Processing Device:</span> {{ result.processing_metadata.processing_device if result.processing_metadata else 'CPU' }}</p>
+                            <p><span class="text-gray-600">Confidence Threshold:</span> {{ result.processing_metadata.confidence_threshold if result.processing_metadata else '0.9' }}</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Analysis Statistics</h4>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="text-gray-600">Images Processed:</span> {{ result.image_results|length if result.image_results else 0 }}</p>
+                            <p><span class="text-gray-600">Text Blocks:</span> {{ result.text_results|length if result.text_results else 0 }}</p>
+                            <p><span class="text-gray-600">Vision Results:</span> {{ result.vision_results|length if result.vision_results else 0 }}</p>
+                            <p><span class="text-gray-600">Total Violations:</span> {{ result.violations|length if result.violations else 0 }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if result.summary_stats %}
+                <div class="mt-4">
+                    <h4 class="font-semibold text-gray-900 mb-2">Summary Statistics</h4>
+                    <pre class="text-xs bg-white p-3 rounded border overflow-x-auto">{{ result.summary_stats | tojson(indent=2) }}</pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function shareResults() {
+    if (navigator.share) {
+        navigator.share({
+            title: 'PDF Content Analysis Results',
+            text: 'Analysis completed for {{ result.file_name }}. Risk Level: {{ result.overall_risk_level|title }}',
+            url: window.location.href
+        }).catch(console.error);
+    } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            showNotification('Results URL copied to clipboard!', 'success');
+        }).catch(() => {
+            showNotification('Unable to copy URL', 'error');
+        });
+    }
+}
+
+function exportToCSV() {
+    {% if result.violations %}
+    const violations = {{ result.violations | tojson }};
+    
+    // Create CSV content
+    const headers = ['Page', 'Type', 'Severity', 'Category', 'Description', 'Confidence'];
+    const csvContent = [
+        headers.join(','),
+        ...violations.map(v => [
+            v.page_number || 'N/A',
+            v.violation_type || 'Unknown',
+            v.severity || 'Low',
+            v.category || 'General',
+            `"${(v.description || 'No description').replace(/"/g, '""')}"`,
+            v.confidence || 0
+        ].join(','))
+    ].join('\n');
+    
+    // Download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'content_analysis_results.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    showNotification('CSV file downloaded!', 'success');
+    {% else %}
+    showNotification('No violations to export', 'info');
+    {% endif %}
+}
+
+function viewTechnicalDetails() {
+    const details = document.getElementById('technicalDetails');
+    if (details.classList.contains('hidden')) {
+        details.classList.remove('hidden');
+        details.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        details.classList.add('hidden');
+    }
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 text-white ${bgColor}`;
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2"></i>
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        notification.style.transition = 'all 0.3s ease';
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+// Add loading animations
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.bg-white');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.6s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,595 @@
+<!-- templates/results_preview.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results Preview - DocShield Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --info-color: #3498db;
+            --dark-color: #34495e;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .preview-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin: 2rem auto;
+            max-width: 95%;
+        }
+
+        .preview-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--dark-color));
+            color: white;
+            border-radius: 15px 15px 0 0;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .risk-badge {
+            font-size: 1.2rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .risk-critical { background: #e74c3c; }
+        .risk-high { background: #e67e22; }
+        .risk-medium { background: #f39c12; }
+        .risk-low { background: #27ae60; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            border-left: 4px solid var(--info-color);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .violation-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .violation-header {
+            padding: 1rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .violation-critical .violation-header { background: var(--secondary-color); }
+        .violation-high .violation-header { background: #e67e22; }
+        .violation-medium .violation-header { background: var(--warning-color); }
+        .violation-low .violation-header { background: #95a5a6; }
+
+        .image-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .image-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .image-status {
+            margin-top: 1rem;
+            font-weight: bold;
+            padding: 0.5rem;
+            border-radius: 5px;
+        }
+
+        .status-violation {
+            background: #fee;
+            color: var(--secondary-color);
+        }
+
+        .status-replacement {
+            background: #efe;
+            color: var(--success-color);
+        }
+
+        .highlighted-text {
+            background: linear-gradient(120deg, #ffeb3b 0%, #ff9800 100%);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .text-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-left: 4px solid var(--info-color);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .download-section {
+            background: #f8f9fa;
+            border-radius: 0 0 15px 15px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, var(--success-color), #2ecc71);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+            color: white;
+        }
+
+        .progress-section {
+            margin: 2rem 0;
+        }
+
+        .progress {
+            height: 20px;
+            border-radius: 10px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--info-color), #5dade2);
+            transition: width 0.3s ease;
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--info-color);
+        }
+
+        .page-navigation {
+            display: flex;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .page-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            margin: 0 0.25rem;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .page-btn.active {
+            background: var(--info-color);
+        }
+
+        .cultural-compliance {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .compliance-score {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .image-comparison {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .preview-container {
+                margin: 1rem;
+                border-radius: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="preview-container">
+            <!-- Header Section -->
+            <div class="preview-header">
+                <h1><i class="fas fa-shield-alt"></i> Content Moderation Results</h1>
+                <h3>{{ result.file_name }}</h3>
+                <div class="mt-3">
+                    <span class="risk-badge risk-{{ result.overall_risk_level }}">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{ result.overall_risk_level|upper }} RISK
+                    </span>
+                </div>
+                <div class="mt-2">
+                    <small>Processed on {{ result.processing_timestamp|strftime('%B %d, %Y at %I:%M %p') }}</small>
+                </div>
+            </div>
+
+            <div class="p-4">
+                <!-- Statistics Overview -->
+                <div class="section-title">
+                    <i class="fas fa-chart-bar"></i> Analysis Overview
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ result.total_pages }}</div>
+                        <div>Pages Analyzed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ result.total_images }}</div>
+                        <div>Images Found</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ result.total_violations }}</div>
+                        <div>Violations Detected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{{ (result.overall_confidence * 100)|round }}%</div>
+                        <div>Confidence Level</div>
+                    </div>
+                </div>
+
+                <!-- Cultural Compliance Score -->
+                {% if result.summary_stats and result.summary_stats.cultural_compliance %}
+                <div class="cultural-compliance">
+                    <h4><i class="fas fa-mosque"></i> Cultural Compliance Assessment</h4>
+                    <div class="compliance-score">
+                        {{ (result.summary_stats.cultural_compliance * 100)|round }}%
+                    </div>
+                    <p class="text-center">
+                        {% if result.summary_stats.cultural_compliance > 0.8 %}
+                            <i class="fas fa-check-circle"></i> Highly compliant with Islamic/Middle Eastern values
+                        {% elif result.summary_stats.cultural_compliance > 0.6 %}
+                            <i class="fas fa-exclamation-circle"></i> Moderately compliant - some concerns identified
+                        {% else %}
+                            <i class="fas fa-times-circle"></i> Non-compliant - significant cultural issues detected
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+
+                <!-- Violations Section -->
+                {% if result.violations %}
+                <div class="section-title">
+                    <i class="fas fa-exclamation-triangle"></i> Detected Violations ({{ result.violations|length }})
+                </div>
+
+                {% for violation in result.violations[:10] %}
+                <div class="violation-card violation-{{ violation.severity }}">
+                    <div class="violation-header">
+                        <i class="fas fa-flag"></i>
+                        Page {{ violation.page_number }} - {{ violation.category|title|replace('_', ' ') }}
+                        <span class="float-end">{{ violation.severity|upper }}</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">{{ violation.description }}</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Confidence:</strong> {{ (violation.confidence * 100)|round }}%
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Risk Factors:</strong> {{ violation.risk_factors|join(', ') }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if result.violations|length > 10 %}
+                <div class="text-center mt-3">
+                    <button class="btn btn-outline-primary" onclick="showAllViolations()">
+                        <i class="fas fa-eye"></i> Show All {{ result.violations|length }} Violations
+                    </button>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <!-- Image Analysis Results -->
+                {% if result.image_results %}
+                <div class="section-title">
+                    <i class="fas fa-images"></i> Image Analysis Results
+                </div>
+
+                <div id="imageResults">
+                    {% for image_result in result.image_results[:5] %}
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong>Page {{ image_result.page_number }} - Image {{ image_result.image_index }}</strong>
+                            {% if image_result.violations %}
+                                <span class="badge bg-danger float-end">{{ image_result.violations|length }} Issues</span>
+                            {% else %}
+                                <span class="badge bg-success float-end">Clean</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <img src="{{ image_result.image_base64 }}" 
+                                         alt="Detected Image" 
+                                         class="img-fluid rounded">
+                                </div>
+                                <div class="col-md-8">
+                                    <h6>Analysis:</h6>
+                                    <p>{{ image_result.caption }}</p>
+                                    
+                                    {% if image_result.violations %}
+                                    <h6 class="text-danger">Issues Detected:</h6>
+                                    <ul class="list-unstyled">
+                                        {% for violation in image_result.violations %}
+                                        <li class="mb-1">
+                                            <span class="badge bg-{{ 'danger' if violation.severity == 'high' else 'warning' }}">
+                                                {{ violation.severity }}
+                                            </span>
+                                            {{ violation.description }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+
+                                    <!-- Replacement Preview -->
+                                    {% if image_result.replacement_image %}
+                                    <div class="image-comparison mt-3">
+                                        <div class="image-box">
+                                            <h6 class="text-danger">Original</h6>
+                                            <img src="{{ image_result.image_base64 }}" alt="Original">
+                                            <div class="image-status status-violation">
+                                                <i class="fas fa-times"></i> Cultural Compliance Issue
+                                            </div>
+                                        </div>
+                                        <div class="image-box">
+                                            <h6 class="text-success">Replacement</h6>
+                                            <img src="{{ image_result.replacement_image.image_base64 }}" alt="Replacement">
+                                            <div class="image-status status-replacement">
+                                                <i class="fas fa-check"></i> Culturally Appropriate
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <strong>Replacement Method:</strong> {{ image_result.replacement_image.generation_method }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if result.image_results|length > 5 %}
+                <div class="text-center mt-3">
+                    <button class="btn btn-outline-primary" onclick="showAllImages()">
+                        <i class="fas fa-images"></i> Show All {{ result.image_results|length }} Images
+                    </button>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <!-- Text Analysis Results -->
+                {% if result.text_results %}
+                <div class="section-title">
+                    <i class="fas fa-file-text"></i> Text Analysis Results
+                </div>
+
+                {% for text_result in result.text_results[:3] %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <strong>Page {{ loop.index }}</strong>
+                        {% if text_result.violations %}
+                            <span class="badge bg-warning float-end">{{ text_result.violations|length }} Keywords Found</span>
+                        {% else %}
+                            <span class="badge bg-success float-end">Clean Text</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {% if text_result.violations %}
+                        <h6 class="text-warning">Highlighted Keywords:</h6>
+                        <div class="text-preview">
+                            {{ text_result.analysis_details.extracted_text[:500]|highlight_keywords(text_result.risk_keywords)|safe }}
+                            {% if text_result.analysis_details.extracted_text|length > 500 %}...{% endif %}
+                        </div>
+                        {% else %}
+                        <div class="text-preview">
+                            <p class="text-muted">No risk keywords detected in this section.</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <small><strong>Words:</strong> {{ text_result.total_words }}</small>
+                            </div>
+                            <div class="col-md-4">
+                                <small><strong>Language:</strong> {{ text_result.language|title }}</small>
+                            </div>
+                            <div class="col-md-4">
+                                <small><strong>Quality Score:</strong> {{ (text_result.text_quality_score * 100)|round }}%</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                <!-- Processing Information -->
+                <div class="section-title">
+                    <i class="fas fa-cogs"></i> Processing Information
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6><i class="fas fa-clock"></i> Processing Time</h6>
+                                <p>{{ result.processing_metadata.processing_time_seconds|round(2) }} seconds</p>
+                                
+                                <h6><i class="fas fa-file"></i> File Information</h6>
+                                <p>Size: {{ result.processing_metadata.pdf_file_size_mb }} MB</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6><i class="fas fa-brain"></i> AI Models Used</h6>
+                                <ul class="list-unstyled">
+                                    {% for model in result.processing_metadata.models_used %}
+                                    <li><i class="fas fa-check text-success"></i> {{ model }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Section -->
+            <div class="download-section">
+                <h4><i class="fas fa-download"></i> Download Results</h4>
+                <p class="text-muted">Choose your preferred format to download the complete analysis report</p>
+                
+                <div class="row justify-content-center">
+                    <div class="col-auto">
+                        <a href="{{ url_for('download_report', document_id=result.document_id, format='pdf') }}" 
+                           class="btn btn-download">
+                            <i class="fas fa-file-pdf"></i> Download PDF Report
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('download_report', document_id=result.document_id, format='html') }}" 
+                           class="btn btn-download">
+                            <i class="fas fa-file-code"></i> Download HTML Report
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('download_report', document_id=result.document_id, format='json') }}" 
+                           class="btn btn-download">
+                            <i class="fas fa-file-code"></i> Download JSON Data
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Reports include detailed analysis, highlighted issues, and replacement suggestions
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Progressive enhancement functions
+        function showAllViolations() {
+            // Implementation for showing all violations
+            document.getElementById('allViolations').style.display = 'block';
+            event.target.style.display = 'none';
+        }
+
+        function showAllImages() {
+            // Implementation for showing all images
+            document.getElementById('allImages').style.display = 'block';
+            event.target.style.display = 'none';
+        }
+
+        // Auto-refresh progress if processing is still ongoing
+        {% if result.current_phase != 'Completed' %}
+        setInterval(function() {
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    // Update progress section only
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newProgress = doc.querySelector('.progress-section');
+                    if (newProgress) {
+                        document.querySelector('.progress-section').innerHTML = newProgress.innerHTML;
+                    }
+                });
+        }, 5000); // Refresh every 5 seconds
+        {% endif %}
+
+        // Smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

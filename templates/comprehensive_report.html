@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Content Analysis Report - {{ result.file_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+
+        .report-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .report-header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .report-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
+        }
+
+        .report-title {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+        }
+
+        .report-subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 0.75rem 2rem;
+            border-radius: 25px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            margin-top: 1rem;
+        }
+
+        .risk-critical { background: #e74c3c; }
+        .risk-high { background: #e67e22; }
+        .risk-medium { background: #f39c12; }
+        .risk-low { background: #27ae60; }
+
+        .report-meta {
+            background: #ecf0f1;
+            padding: 1.5rem;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+            display: block;
+        }
+
+        .meta-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            padding: 2rem;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #3498db;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-icon {
+            font-size: 1.5rem;
+            color: #3498db;
+        }
+
+        /* Executive Summary */
+        .executive-summary {
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            border-left: 5px solid #3498db;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .key-findings {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .findings-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .findings-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f3f4;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .findings-list li::before {
+            content: "▶";
+            position: absolute;
+            left: 0;
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        /* Cultural Compliance */
+        .cultural-compliance {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .compliance-score {
+            font-size: 4rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .compliance-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .compliance-item {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Violations Section */
+        .violations-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .violation-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid;
+        }
+
+        .violation-card.critical { border-left-color: #e74c3c; }
+        .violation-card.high { border-left-color: #e67e22; }
+        .violation-card.medium { border-left-color: #f39c12; }
+        .violation-card.low { border-left-color: #95a5a6; }
+
+        .violation-header {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .violation-title {
+            font-weight: bold;
+            color: #2c3e50;
+            flex-grow: 1;
+        }
+
+        .violation-severity {
+            background: #3498db;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .violation-body {
+            padding: 1rem;
+        }
+
+        .violation-description {
+            margin-bottom: 1rem;
+            color: #555;
+        }
+
+        .violation-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Image Analysis Section */
+        .image-analysis-grid {
+            display: grid;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .image-analysis-item {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .image-header {
+            background: #34495e;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .image-title {
+            font-weight: bold;
+        }
+
+        .image-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .status-clean { background: #27ae60; }
+        .status-issues { background: #e74c3c; }
+
+        .image-content {
+            padding: 1.5rem;
+        }
+
+        .image-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 1rem 0;
+        }
+
+        .image-box {
+            text-align: center;
+        }
+
+        .image-box h4 {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .original-title { 
+            background: #fee; 
+            color: #e74c3c; 
+        }
+
+        .replacement-title { 
+            background: #efe; 
+            color: #27ae60; 
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+
+        .image-caption {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .generation-info {
+            font-size: 0.8rem;
+            color: #888;
+            background: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        /* Text Analysis Section */
+        .text-analysis-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .text-analysis-item {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .text-preview {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .highlight-critical {
+            background: linear-gradient(120deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .highlight-high {
+            background: linear-gradient(120deg, #e67e22 0%, #d35400 100%);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .highlight-medium {
+            background: linear-gradient(120deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+
+        .highlight-low {
+            background: linear-gradient(120deg, #95a5a6 0%, #7f8c8d 100%);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        /* Recommendations Section */
+        .recommendations-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .recommendation-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            border-left: 5px solid;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .recommendation-card.critical { border-left-color: #e74c3c; }
+        .recommendation-card.high { border-left-color: #e67e22; }
+        .recommendation-card.medium { border-left-color: #f39c12; }
+        .recommendation-card.low { border-left-color: #27ae60; }
+
+        .recommendation-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .recommendation-actions {
+            list-style: none;
+            padding: 0;
+            margin-top: 1rem;
+        }
+
+        .recommendation-actions li {
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .recommendation-actions li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        /* Processing Information */
+        .processing-info {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+
+        .processing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .processing-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .processing-card h4 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .models-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .models-list li {
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .models-list li::before {
+            content: "🤖";
+            position: absolute;
+            left: 0;
+        }
+
+        /* Footer */
+        .report-footer {
+            background: #2c3e50;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            margin-bottom: 1rem;
+        }
+
+        .generation-timestamp {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { 
+                background: white; 
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            
+            .report-container { 
+                box-shadow: none; 
+                max-width: none;
+            }
+            
+            .section { 
+                page-break-inside: avoid; 
+                break-inside: avoid;
+            }
+            
+            .image-comparison { 
+                grid-template-columns: 1fr; 
+                gap: 1rem;
+            }
+            
+            .image-box img { 
+                max-height: 200px; 
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .report-title { font-size: 2rem; }
+            
+            .summary-grid,
+            .image-comparison,
+            .processing-grid { 
+                grid-template-columns: 1fr; 
+            }
+            
+            .meta-grid { 
+                grid-template-columns: repeat(2, 1fr); 
+            }
+            
+            .section { 
+                padding: 1rem; 
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Report Container -->
+    <div class="report-container">
+        
+        <!-- Header -->
+        <header class="report-header">
+            <h1 class="report-title">📋 Professional Content Analysis</h1>
+            <h2 class="report-subtitle">{{ result.file_name }}</h2>
+            <div class="risk-badge risk-{{ result.overall_risk_level }}">
+                {{ result.overall_risk_level|upper }} RISK LEVEL
+            </div>
+            <div class="generation-timestamp">
+                Generated on {{ generation_timestamp|strftime('%B %d, %Y at %I:%M %p') }}
+            </div>
+        </header>
+
+        <!-- Metadata Overview -->
+        <section class="report-meta">
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <span class="meta-value">{{ result.total_pages }}</span>
+                    <span class="meta-label">Pages Analyzed</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-value">{{ result.total_images }}</span>
+                    <span class="meta-label">Images Found</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-value">{{ result.total_violations }}</span>
+                    <span class="meta-label">Violations Detected</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-value">{{ (result.overall_confidence * 100)|round }}%</span>
+                    <span class="meta-label">Analysis Confidence</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Executive Summary -->
+        <section class="section executive-summary">
+            <h2 class="section-title">
+                <span class="section-icon">📊</span>
+                Executive Summary
+            </h2>
+            
+            <div class="summary-grid">
+                <div class="key-findings">
+                    <h3>Key Findings</h3>
+                    <ul class="findings-list">
+                        {% for finding in summary.key_findings %}
+                        <li>{{ finding }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="key-findings">
+                    <h3>Risk Distribution</h3>
+                    <ul class="findings-list">
+                        <li>Critical: {{ summary.risk_distribution.critical }} violations</li>
+                        <li>High: {{ summary.risk_distribution.high }} violations</li>
+                        <li>Medium: {{ summary.risk_distribution.medium }} violations</li>
+                        <li>Low: {{ summary.risk_distribution.low }} violations</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cultural Compliance Assessment -->
+        {% if result.summary_stats and result.summary_stats.cultural_compliance %}
+        <section class="cultural-compliance">
+            <h2>🕌 Cultural Compliance Assessment</h2>
+            <div class="compliance-score">
+                {{ (result.summary_stats.cultural_compliance * 100)|round }}%
+            </div>
+            <p style="font-size: 1.2rem; margin-bottom: 2rem;">
+                {% if result.summary_stats.cultural_compliance > 0.8 %}
+                    ✅ Highly compliant with Islamic and Middle Eastern cultural values
+                {% elif result.summary_stats.cultural_compliance > 0.6 %}
+                    ⚠️ Moderately compliant - some cultural concerns identified
+                {% else %}
+                    ❌ Non-compliant - significant cultural issues detected
+                {% endif %}
+            </p>
+            
+            <div class="compliance-details">
+                <div class="compliance-item">
+                    <h4>Islamic Values</h4>
+                    <p>{{ "Appropriate" if result.summary_stats.cultural_compliance > 0.7 else "Needs Review" }}</p>
+                </div>
+                <div class="compliance-item">
+                    <h4>Middle Eastern Context</h4>
+                    <p>{{ "Compliant" if result.summary_stats.cultural_compliance > 0.6 else "Concerning" }}</p>
+                </div>
+                <div class="compliance-item">
+                    <h4>Family-Friendly</h4>
+                    <p>{{ "Yes" if result.summary_stats.cultural_compliance > 0.5 else "No" }}</p>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Violations Analysis -->
+        {% if result.violations %}
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">⚠️</span>
+                Detected Violations ({{ result.violations|length }})
+            </h2>
+            
+            <div class="violations-grid">
+                {% for violation in result.violations %}
+                <div class="violation-card {{ violation.severity }}">
+                    <div class="violation-header">
+                        <div class="violation-title">
+                            📍 Page {{ violation.page_number }} - {{ violation.category|title|replace('_', ' ') }}
+                        </div>
+                        <div class="violation-severity">{{ violation.severity|upper }}</div>
+                    </div>
+                    <div class="violation-body">
+                        <div class="violation-description">{{ violation.description }}</div>
+                        <div class="violation-details">
+                            <div><strong>Confidence:</strong> {{ (violation.confidence * 100)|round }}%</div>
+                            <div><strong>Risk Factors:</strong> {{ violation.risk_factors|join(', ') }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Image Analysis with Replacements -->
+        {% if result.image_results %}
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🖼️</span>
+                Image Analysis with AI Replacements
+            </h2>
+            
+            <div class="image-analysis-grid">
+                {% for image_result in result.image_results %}
+                <div class="image-analysis-item">
+                    <div class="image-header">
+                        <div class="image-title">
+                            📄 Page {{ image_result.page_number }} - Image {{ image_result.image_index }}
+                        </div>
+                        <div class="image-status {{ 'status-issues' if (image_result.violations and image_result.violations|length > 0) else 'status-clean' }}">
+                            {{ image_result.violations|length if image_result.violations else 0 }} Issues
+                        </div>
+                    </div>
+                    
+                    <div class="image-content">
+                        <div class="image-caption">
+                            <strong>Caption:</strong> {{ image_result.caption }}
+                        </div>
+                        
+                        {% if image_result.violations and image_result.violations|length > 0 %}
+                        <div style="margin: 1rem 0;">
+                            <strong style="color: #e74c3c;">🚫 Issues Detected:</strong>
+                            <ul style="margin-left: 1rem; color: #666;">
+                                {% for violation in image_result.violations %}
+                                <li>{{ violation.description }} ({{ violation.severity|upper }})</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% if image_result.replacement_image %}
+                        <div class="image-comparison">
+                            <div class="image-box">
+                                <h4 class="original-title">❌ Original (Detected Issues)</h4>
+                                <img src="{{ image_result.image_base64 }}" alt="Original Image">
+                                <div class="image-caption">Contains inappropriate content</div>
+                            </div>
+                            <div class="image-box">
+                                <h4 class="replacement-title">✅ AI-Generated Replacement</h4>
+                                <img src="{{ image_result.replacement_image.image_base64 }}" alt="Replacement Image">
+                                <div class="image-caption">{{ image_result.replacement_image.cultural_context }}</div>
+                                <div class="generation-info">
+                                    Generated using: {{ image_result.replacement_image.generation_method }}<br>
+                                    Confidence: {{ (image_result.replacement_image.confidence * 100)|round }}%
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div style="text-align: center; margin: 1rem 0;">
+                            <img src="{{ image_result.image_base64 }}" alt="Analyzed Image" style="max-width: 400px; border-radius: 8px;">
+                            {% if not image_result.violations or image_result.violations|length == 0 %}
+                            <div style="color: #27ae60; font-weight: bold; margin-top: 0.5rem;">✅ No Issues Detected</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Text Analysis with Highlighting -->
+        {% if result.text_results %}
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">📝</span>
+                Text Analysis with Keyword Highlighting
+            </h2>
+            
+            <div class="text-analysis-grid">
+                {% for text_result in result.text_results %}
+                <div class="text-analysis-item">
+                    <h3>📄 Page {{ loop.index }}</h3>
+                    
+                    {% if text_result.violations and text_result.violations|length > 0 %}
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #e67e22;">⚠️ {{ text_result.violations|length }} Risk Keywords Found</strong>
+                    </div>
+                    
+                    <div class="text-preview">
+                        {{ text_result.analysis_details.extracted_text[:800]|highlight_keywords(text_result.risk_keywords)|safe }}
+                        {% if text_result.analysis_details.extracted_text|length > 800 %}
+                        <div style="text-align: center; margin-top: 1rem; font-style: italic; color: #888;">
+                            ... (text truncated for display)
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div style="margin-top: 1rem;">
+                        <strong>Detected Keywords:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            {% for keyword in text_result.risk_keywords %}
+                            <span class="highlight-{{ keyword.severity }}" style="margin: 0.2rem; display: inline-block;">
+                                {{ keyword.keyword }} ({{ keyword.severity }})
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="color: #27ae60; font-weight: bold;">✅ No Risk Keywords Detected</div>
+                    <div class="text-preview" style="border-left-color: #27ae60;">
+                        {{ text_result.analysis_details.extracted_text[:400] }}
+                        {% if text_result.analysis_details.extracted_text|length > 400 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                        <div><strong>Words:</strong> {{ text_result.total_words }}</div>
+                        <div><strong>Language:</strong> {{ text_result.language|title }}</div>
+                        <div><strong>Quality:</strong> {{ (text_result.text_quality_score * 100)|round }}%</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Recommendations -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">💡</span>
+                Professional Recommendations
+            </h2>
+            
+            <div class="recommendations-grid">
+                {% for recommendation in recommendations %}
+                <div class="recommendation-card {{ recommendation.priority }}">
+                    <div class="recommendation-title">
+                        {% if recommendation.priority == 'critical' %}🚨
+                        {% elif recommendation.priority == 'high' %}⚠️
+                        {% elif recommendation.priority == 'medium' %}📋
+                        {% else %}✅{% endif %}
+                        {{ recommendation.title }}
+                    </div>
+                    <div class="recommendation-description">{{ recommendation.description }}</div>
+                    <ul class="recommendation-actions">
+                        {% for action in recommendation.actions %}
+                        <li>{{ action }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Processing Information -->
+        <section class="section processing-info">
+            <h2 class="section-title">
+                <span class="section-icon">⚙️</span>
+                Processing Information
+            </h2>
+            
+            <div class="processing-grid">
+                <div class="processing-card">
+                    <h4>🕒 Performance Metrics</h4>
+                    <p><strong>Processing Time:</strong> {{ result.processing_metadata.processing_time_seconds|round(2) }} seconds</p>
+                    <p><strong>File Size:</strong> {{ result.processing_metadata.pdf_file_size_mb }} MB</p>
+                    <p><strong>Analysis Confidence:</strong> {{ (result.overall_confidence * 100)|round }}%</p>
+                </div>
+                
+                <div class="processing-card">
+                    <h4>🤖 AI Models Used</h4>
+                    <ul class="models-list">
+                        {% for model in result.processing_metadata.models_used %}
+                        <li>{{ model }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="processing-card">
+                    <h4>🌍 Cultural Context</h4>
+                    <p><strong>Focus:</strong> Islamic & Middle Eastern Values</p>
+                    <p><strong>Compliance Standard:</strong> Conservative Family-Friendly</p>
+                    <p><strong>Region:</strong> Middle East & North Africa</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="report-footer">
+            <div class="footer-content">
+                <h3>🛡️ DocShield Pro - Professional Content Analysis</h3>
+                <p>Advanced AI-powered content moderation with cultural compliance focus</p>
+            </div>
+            <div class="generation-timestamp">
+                Report generated on {{ generation_timestamp|strftime('%Y-%m-%d %H:%M:%S UTC') }}<br>
+                🤖 Powered by Advanced Machine Learning Models
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
