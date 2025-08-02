@@ -1577,18 +1577,20 @@ def create_enhanced_app():
 # Create app instance for gunicorn
 try:
     app = create_enhanced_app()
-except:
+    print("✅ Full app loaded successfully!")
+except Exception as e:
+    print(f"❌ Full app failed: {e}")
     # Fallback app if creation fails
     from flask import Flask, jsonify
     app = Flask(__name__)
     
     @app.route('/health')
     def health():
-        return jsonify({'status': 'ok'})
+        return jsonify({'status': 'fallback', 'error': str(e)})
     
     @app.route('/')
     def home():
-        return '<h1>PDF Content Moderator - Fallback Mode</h1>'
+        return f'<h1>PDF Content Moderator - Fallback Mode</h1><p>Error: {e}</p>'
 
 if __name__ == '__main__':
     print("🎯 Starting Smart DocShield Pro...")
