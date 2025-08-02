@@ -18,6 +18,10 @@ from flask import Flask, request, render_template, redirect, flash, jsonify, sen
 from werkzeug.utils import secure_filename
 import logging
 
+# Setup logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('pdf_content_moderator')
+
 # Database imports
 try:
     from database.models import (
@@ -29,10 +33,6 @@ try:
 except Exception as e:
     DATABASE_AVAILABLE = False
     logger.warning(f"⚠️ Database not available: {e}")
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('pdf_content_moderator')
 
 # Add current directory to Python path
 current_dir = Path(__file__).parent

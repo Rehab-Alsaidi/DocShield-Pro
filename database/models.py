@@ -6,7 +6,14 @@ from datetime import datetime
 import uuid
 from typing import Optional, Dict, Any
 
-from app.config import db_config
+try:
+    from app.config import db_config
+except ImportError:
+    # Fallback for Railway deployment
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from app.config import db_config
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
