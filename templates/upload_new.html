@@ -236,15 +236,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.querySelector('input[name="file"]');
     
     form.addEventListener('submit', function(e) {
-        e.preventDefault(); // Prevent default form submission
-        
         const file = fileInput.files[0];
         if (!file) {
+            e.preventDefault();
             alert('Please select a PDF file');
             return false;
         }
         
         if (!file.name.toLowerCase().endsWith('.pdf')) {
+            e.preventDefault();
             alert('Please select a PDF file');
             return false;
         }
@@ -270,48 +270,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Start workflow simulation
         startWorkflow();
         
-        // Submit form asynchronously to prevent freezing
-        setTimeout(() => {
-            submitFormAsync();
-        }, 1000);
-        
-        return false;
+        // Let the form submit normally - no preventDefault()
+        return true;
     });
     
-    function submitFormAsync() {
-        const formData = new FormData(form);
-        
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            return response.text();
-        })
-        .then(html => {
-            // Check if response is actually HTML (successful) or error message
-            if (html.includes('<html') || html.includes('<!DOCTYPE')) {
-                // Replace entire page content with results
-                document.open();
-                document.write(html);
-                document.close();
-            } else {
-                throw new Error('Invalid response received');
-            }
-        })
-        .catch(error => {
-            console.error('Upload Error:', error);
-            alert(`Upload failed: ${error.message}. Please try again.`);
-            // Reset form
-            submitBtn.disabled = false;
-            submitText.classList.remove('hidden');
-            loadingText.classList.add('hidden');
-            progressIndicator.classList.add('hidden');
-        });
-    }
     
     function startWorkflow() {
         const progressBar = document.getElementById('progressBar');
