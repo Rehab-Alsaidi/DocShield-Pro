@@ -237,40 +237,15 @@ class AdvancedVisionLanguageAnalyzer:
             logger.info("🚂 Railway environment detected - using memory-optimized model loading")
         
         try:
-            # Florence-2: Start with base model for Railway memory constraints
-            logger.info("Loading Florence-2 model (optimized for Railway)...")
-            try:
-                # Try base model first (smaller, more likely to work on Railway)
-                self.florence_processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
-                self.florence_model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
-                if self.device == "cuda" and torch.cuda.is_available():
-                    self.florence_model = self.florence_model.to(self.device)
-                logger.info("✅ Florence-2-base model loaded successfully (Railway optimized)")
-            except Exception as e:
-                logger.warning(f"Florence-2-base failed: {e}, skipping Florence models to save memory")
-                self.florence_model = None
-                self.florence_processor = None
+            # Skip Florence-2 models - missing dependencies (timm, einops) on Railway
+            logger.info("⚡ Skipping Florence-2 models (missing dependencies: timm, einops)")
+            self.florence_model = None
+            self.florence_processor = None
             
-            # BLIP-2: Advanced image captioning and VQA
-            logger.info("Loading BLIP-2 model (Railway memory optimized)...")
-            try:
-                # Use smaller BLIP-2 for Railway
-                logger.info("⚡ Using memory-efficient BLIP-2 configuration")
-                self.blip2_processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b", trust_remote_code=True)
-                self.blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", trust_remote_code=True, torch_dtype="auto")
-                if self.device == "cuda" and torch.cuda.is_available():
-                    self.blip2_model = self.blip2_model.to(self.device)
-                logger.info("✅ BLIP-2 model loaded successfully")
-            except Exception as e:
-                logger.warning(f"BLIP-2 large not available: {e}, trying BLIP-2 Flan-T5")
-                try:
-                    self.blip2_processor = Blip2Processor.from_pretrained("Salesforce/blip2-flan-t5-xl", trust_remote_code=True)
-                    self.blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-flan-t5-xl", trust_remote_code=True)
-                    if self.device == "cuda" and torch.cuda.is_available():
-                        self.blip2_model = self.blip2_model.to(self.device)
-                    logger.info("✅ BLIP-2 Flan-T5 model loaded successfully")
-                except Exception as e2:
-                    logger.warning(f"BLIP-2 models not available: {e2}")
+            # Skip BLIP-2 models - they have warnings and we have working BLIP + CLIP
+            logger.info("⚡ Skipping BLIP-2 models (using regular BLIP which works fine)")
+            self.blip2_model = None
+            self.blip2_processor = None
             
             # Fallback to regular BLIP with multiple model options
             if self.blip2_model is None:
