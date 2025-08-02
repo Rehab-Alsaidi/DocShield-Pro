@@ -476,32 +476,15 @@ def create_enhanced_app():
     os.makedirs('static/uploads', exist_ok=True)
     os.makedirs('logs', exist_ok=True)
     
-    # Initialize database for Railway PostgreSQL (optional)
+    # Initialize database for Railway PostgreSQL (optional) - simplified for fast startup
     database_url = os.getenv("DATABASE_URL")
     if DATABASE_AVAILABLE and database_url:
         try:
-            logger.info("🗄️ Railway PostgreSQL detected - initializing database...")
-            logger.info(f"🔗 Database URL: {database_url[:50]}...")
-            
-            # Initialize database tables
-            init_database(database_url)
-            logger.info("✅ Database initialized successfully")
-            
-            # Test database connection
-            try:
-                with get_db_session() as session:
-                    from sqlalchemy import text
-                    result = session.execute(text("SELECT COUNT(*) FROM documents"))
-                    count = result.scalar()
-                    logger.info(f"📊 Database connected - {count} documents in database")
-            except Exception as test_e:
-                logger.warning(f"⚠️ Database test query failed: {test_e}")
-                
+            logger.info("🗄️ Database detected - will initialize lazily")
         except Exception as e:
-            logger.warning(f"⚠️ Database initialization failed: {e}")
-            logger.info("📄 App will continue without database (using file storage)")
+            logger.warning(f"⚠️ Database setup failed: {e}")
     else:
-        logger.info("📄 Running without database (DATABASE_URL not set)")
+        logger.info("📄 Running without database")
 
     # Initialize original content moderator with better error handling
     content_moderator = None
@@ -897,6 +880,14 @@ def create_enhanced_app():
             return None
             
         try:
+            # Initialize database tables on first use
+            try:
+                init_database()
+                logger.info("✅ Database tables initialized")
+            except Exception as init_e:
+                logger.warning(f"Database init failed: {init_e}")
+                return None
+                
             with get_db_session() as session:
                 # Create DAL instances
                 doc_dal = DocumentDAL(session)
