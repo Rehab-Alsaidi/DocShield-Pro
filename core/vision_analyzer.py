@@ -229,32 +229,34 @@ class AdvancedVisionLanguageAnalyzer:
         if not ADVANCED_MODELS_AVAILABLE:
             logger.info("Advanced models not available, using basic analysis")
             return
+            
+        # Check Railway environment for memory optimization
+        railway_env = os.getenv("RAILWAY_ENVIRONMENT")
+        if railway_env:
+            logger.info("🚂 Railway environment detected - using memory-optimized model loading")
         
         try:
-            # Florence-2: Microsoft's latest vision-language model
-            logger.info("Loading Florence-2 model...")
+            # Florence-2: Start with base model for Railway memory constraints
+            logger.info("Loading Florence-2 model (optimized for Railway)...")
             try:
-                self.florence_processor = AutoProcessor.from_pretrained("microsoft/Florence-2-large", trust_remote_code=True)
-                self.florence_model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-large", trust_remote_code=True)
+                # Try base model first (smaller, more likely to work on Railway)
+                self.florence_processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
+                self.florence_model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
                 if self.device == "cuda" and torch.cuda.is_available():
                     self.florence_model = self.florence_model.to(self.device)
-                logger.info("✅ Florence-2 model loaded successfully")
+                logger.info("✅ Florence-2-base model loaded successfully (Railway optimized)")
             except Exception as e:
-                logger.warning(f"Florence-2 not available: {e}, trying Florence-2-base")
-                try:
-                    self.florence_processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
-                    self.florence_model = AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
-                    if self.device == "cuda" and torch.cuda.is_available():
-                        self.florence_model = self.florence_model.to(self.device)
-                    logger.info("✅ Florence-2-base model loaded successfully")
-                except Exception as e2:
-                    logger.warning(f"Florence-2-base also failed: {e2}")
+                logger.warning(f"Florence-2-base failed: {e}, skipping Florence models to save memory")
+                self.florence_model = None
+                self.florence_processor = None
             
             # BLIP-2: Advanced image captioning and VQA
-            logger.info("Loading BLIP-2 model...")
+            logger.info("Loading BLIP-2 model (Railway memory optimized)...")
             try:
+                # Use smaller BLIP-2 for Railway
+                logger.info("⚡ Using memory-efficient BLIP-2 configuration")
                 self.blip2_processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b", trust_remote_code=True)
-                self.blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", trust_remote_code=True)
+                self.blip2_model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", trust_remote_code=True, torch_dtype="auto")
                 if self.device == "cuda" and torch.cuda.is_available():
                     self.blip2_model = self.blip2_model.to(self.device)
                 logger.info("✅ BLIP-2 model loaded successfully")
