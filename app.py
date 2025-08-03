@@ -12,8 +12,9 @@ from flask import Flask, request, render_template, redirect, flash, jsonify, sen
 from werkzeug.utils import secure_filename
 import logging
 
-# Setup logging first
+# Setup logging first - disable Werkzeug API status logging
 logging.basicConfig(level=logging.INFO)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 logger = logging.getLogger('pdf_content_moderator')
 
 # Database imports
@@ -742,19 +743,28 @@ def create_enhanced_app():
             risk_keywords = []
             detected_words_with_pages = []
             
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
+            # Parallel processing for PDF pages
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            def analyze_page(page_info):
+                page_num, page = page_info
                 page_text = page.get_text()
                 
+                page_result = {
+                    'page_num': page_num,
+                    'text': page_text,
+                    'words': 0,
+                    'sentences': 0,
+                    'violations': [],
+                    'detected_words': []
+                }
+                
                 if page_text.strip():
-                    all_text += page_text + "\n"
-                    page_texts.append(page_text)
-                    
                     # Count words and sentences
                     words = len(page_text.split())
                     sentences = len([s for s in page_text.split('.') if s.strip()])
-                    total_words += words
-                    total_sentences += sentences
+                    page_result['words'] = words
+                    page_result['sentences'] = sentences
                     
                     # Enhanced comprehensive text analysis
                     if smart_filter:
@@ -762,15 +772,14 @@ def create_enhanced_app():
                         result = smart_filter.analyze_content(page_text, "")
                         if result.get('is_violation', False):
                             violations = result.get('violations', [])
-                            categories = result.get('categories', [])
+                            page_result['violations'] = violations
                             
                             # Process each violation found
                             if violations:
                                 for violation_tuple in violations:
                                     if isinstance(violation_tuple, tuple) and len(violation_tuple) >= 2:
                                         cat, word = violation_tuple
-                                        risk_keywords.append(word)
-                                        detected_words_with_pages.append({
+                                        page_result['detected_words'].append({
                                             'word': word,
                                             'page': page_num + 1,
                                             'category': cat,
@@ -788,18 +797,41 @@ def create_enhanced_app():
                                     for violation_tuple in sentence_violations:
                                         if isinstance(violation_tuple, tuple) and len(violation_tuple) >= 2:
                                             cat, word = violation_tuple
-                                            # Avoid duplicates
-                                            if word not in [kw for kw in risk_keywords]:
-                                                risk_keywords.append(word)
-                                                detected_words_with_pages.append({
+                                            # Check for duplicates in this page
+                                            if not any(d['word'] == word for d in page_result['detected_words']):
+                                                page_result['detected_words'].append({
                                                     'word': word,
                                                     'page': page_num + 1,
                                                     'category': cat,
                                                     'severity': 'high' if cat in smart_filter.high_risk_categories else 'medium'
                                                 })
+                
+                return page_result
+            
+            # Prepare page data for parallel processing
+            page_data = [(page_num, pdf_document[page_num]) for page_num in range(len(pdf_document))]
+            
+            # Process pages in parallel
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                future_to_page = {executor.submit(analyze_page, page_info): page_info[0] for page_info in page_data}
+                
+                for future in as_completed(future_to_page):
+                    page_result = future.result()
+                    
+                    if page_result['text'].strip():
+                        all_text += page_result['text'] + "\n"
+                        page_texts.append(page_result['text'])
+                        total_words += page_result['words']
+                        total_sentences += page_result['sentences']
                         
-                        # Log comprehensive analysis results
-                        logger.info(f"📄 Page {page_num + 1} analysis: Found {len(risk_keywords)} total violation keywords so far")
+                        # Add detected words to global lists
+                        for word_info in page_result['detected_words']:
+                            if word_info['word'] not in risk_keywords:
+                                risk_keywords.append(word_info['word'])
+                            detected_words_with_pages.append(word_info)
+                        
+                        # Log analysis results
+                        logger.info(f"📄 Page {page_result['page_num'] + 1} analysis complete")
             
             pdf_document.close()
             
