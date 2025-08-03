@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Security Analysis - DocShield Pro{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <!-- Professional Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16">
+        <div class="max-w-4xl mx-auto text-center px-6">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-sm rounded-full mb-6">
+                <div class="relative">
+                    <i class="fas fa-shield-alt text-3xl"></i>
+                    <div class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold mb-4">Security Analysis in Progress</h1>
+            <p class="text-xl text-blue-100">Advanced AI models are examining your document for cultural compliance</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="py-12 px-6">
+        <div class="max-w-4xl mx-auto">
+            <!-- Professional Progress Section -->
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+                <div class="p-8">
+                    <!-- Progress Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center">
+                            <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center mr-4">
+                                <i class="fas fa-analytics text-white text-lg"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-900">Document Analysis</h2>
+                                <p class="text-gray-600 text-sm">{{ filename or "Processing document..." }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-600" id="progress-percent">0%</div>
+                            <div class="text-xs text-gray-500">Complete</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sleek Progress Bar -->
+                    <div class="mb-6">
+                        <div class="bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-700 ease-out" 
+                                 id="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="mt-3 text-center">
+                            <span class="text-sm font-medium text-gray-700" id="status-message">Initializing security analysis...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Features Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center">
+                    <div class="w-14 h-14 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-eye text-green-600 text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Computer Vision</h3>
+                    <p class="text-sm text-gray-600">AI models analyze every image for compliance</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-search text-blue-600 text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Content Analysis</h3>
+                    <p class="text-sm text-gray-600">Deep text scanning for cultural violations</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center">
+                    <div class="w-14 h-14 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-certificate text-purple-600 text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Compliance Report</h3>
+                    <p class="text-sm text-gray-600">Comprehensive security and cultural assessment</p>
+                </div>
+            </div>
+            
+            <!-- Professional Status Footer -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-100 p-6 text-center">
+                <div class="flex items-center justify-center mb-3">
+                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-info-circle text-blue-600"></i>
+                    </div>
+                    <span class="text-gray-700 font-medium">Analysis typically completes in 2-4 minutes</span>
+                </div>
+                <p class="text-sm text-gray-500">You'll be automatically redirected when complete</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Professional JavaScript -->
+<script>
+    const processingId = '{{ processing_id }}';
+    let pollCount = 0;
+    const maxPolls = 60; // Maximum 2 minutes of polling
+    
+    function updateProgress(progress, message) {
+        // Update progress bar
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const statusMessage = document.getElementById('status-message');
+        
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
+        if (progressPercent) {
+            progressPercent.textContent = `${progress}%`;
+        }
+        if (statusMessage) {
+            statusMessage.textContent = message;
+        }
+    }
+    
+    function checkStatus() {
+        pollCount++;
+        
+        fetch(`/api/processing-status/${processingId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    updateProgress(100, `Error: ${data.error}`);
+                    // Change progress bar to red for error
+                    const progressBar = document.getElementById('progress-bar');
+                    if (progressBar) {
+                        progressBar.className = 'bg-gradient-to-r from-red-500 to-red-600 h-2 rounded-full transition-all duration-700 ease-out';
+                    }
+                    return;
+                }
+                
+                // Update professional UI
+                updateProgress(data.progress || 0, data.message || 'Processing...');
+                
+                // Check if completed
+                if (data.status === 'completed' || data.status === 'error') {
+                    updateProgress(100, 'Analysis complete - redirecting...');
+                    // Smooth redirect after brief delay
+                    setTimeout(() => {
+                        window.location.href = `/results/${processingId}`;
+                    }, 1500);
+                } else if (pollCount < maxPolls) {
+                    // Continue polling every 2 seconds
+                    setTimeout(checkStatus, 2000);
+                } else {
+                    // Timeout - redirect anyway
+                    updateProgress(100, 'Timeout reached - redirecting...');
+                    setTimeout(() => {
+                        window.location.href = `/results/${processingId}`;
+                    }, 1000);
+                }
+            })
+            .catch(error => {
+                console.error('Status check failed:', error);
+                if (pollCount < maxPolls) {
+                    setTimeout(checkStatus, 5000); // Retry after 5 seconds on error
+                } else {
+                    updateProgress(100, 'Connection error - redirecting...');
+                    setTimeout(() => {
+                        window.location.href = `/results/${processingId}`;
+                    }, 1000);
+                }
+            });
+    }
+    
+    // Start status checking after 1 second
+    setTimeout(checkStatus, 1000);
+    
+    // Add some visual polish - animate the pulsing dot
+    setInterval(() => {
+        const dot = document.querySelector('.animate-pulse');
+        if (dot) {
+            dot.style.opacity = dot.style.opacity === '0.3' ? '1' : '0.3';
+        }
+    }, 1000);
+</script>
+{% endblock %}

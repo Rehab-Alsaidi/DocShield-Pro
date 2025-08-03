@@ -32,6 +32,41 @@ except Exception as e:
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
+# Global content moderator instance for lazy loading
+content_moderator = None
+
+def get_content_moderator():
+    """Lazy load content moderator only when needed"""
+    global content_moderator
+    if content_moderator is None:
+        try:
+            # Set environment variable to force CPU if needed
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Force CPU to avoid GPU issues
+            
+            logger.info("🔄 Loading AI models on-demand...")
+            from core.content_moderator import ContentModerator
+            content_moderator = ContentModerator()
+            logger.info("✅ AI models loaded successfully - BLIP, CLIP, Content Safety active!")
+            
+        except ImportError as e:
+            logger.error(f"❌ Model import failed: {e}")
+            logger.info("💡 Try: pip install --upgrade numpy==1.24.4 torch==2.0.1 transformers==4.33.2")
+            content_moderator = None
+            
+        except Exception as e:
+            logger.error(f"❌ Model initialization failed: {e}")
+            # Try simpler initialization without advanced models
+            try:
+                logger.info("🔄 Attempting basic model initialization...")
+                from core.content_moderator import ContentModerator
+                content_moderator = ContentModerator()
+                logger.info("✅ Basic AI models loaded")
+            except:
+                logger.error("❌ All model initialization failed")
+                content_moderator = None
+    
+    return content_moderator
+
 # Simple but HIGHLY accurate content filter
 class SmartContentFilter:
     """
@@ -65,7 +100,8 @@ class SmartContentFilter:
                 'alcohol', 'alcoholic', 'liquor', 'wine', 'beer', 'spirits', 'champagne', 
                 'vodka', 'whiskey', 'rum', 'gin', 'tequila', 'brandy', 'cocktail', 
                 'margarita', 'martini', 'pub', 'bar', 'club', 'nightclub', 'brewery', 
-                'drunk', 'intoxicated', 'glasses of champagne'
+                'drunk', 'intoxicated', 'glasses of champagne', 'champagne glasses',
+                'glass of champagne', 'champagne glass', 'wine glass', 'wine glasses'
             ],
             'haram_pork': [
                 'pork', 'pig', 'piglet', 'swine', 'boar', 'bacon', 'ham', 'sausage', 
@@ -165,7 +201,8 @@ class SmartContentFilter:
             'mixed_gender_inappropriate': [
                 'hug', 'kiss', 'cuddle', 'hold hands', 'caress', 'embrace non-related', 
                 'public display of affection', 'pda', 'mixed-gender party', 
-                'dancing close suggestive', 'prom', 'school dance', 'co-ed social'
+                'dancing close suggestive', 'prom', 'school dance', 'co-ed social',
+                'a man and a woman', 'man and woman', 'men and women', 'male and female'
             ],
             
             # MEDIUM RISK - Political Sensitivities
@@ -206,9 +243,12 @@ class SmartContentFilter:
             'food', 'bread', 'rice', 'fruit', 'vegetable', 'water', 'tea',
             'sports', 'football', 'basketball', 'tennis', 'exercise', 'gym',
             'islamic', 'muslim', 'quran', 'prayer', 'mosque', 'halal', 'arabic',
-            'silhouette', 'silhouettes', 'shadow', 'outline', 'profile',
-            'salmon', 'fish', 'cutting board', 'wooden board', 'food preparation',
-            'woman silhouette', 'female silhouette', 'long hair silhouette'
+            'silhouette', 'silhouettes', 'shadow', 'shadows', 'outline', 'outlines', 'profile', 'profiles',
+            'salmon', 'fish', 'seafood', 'cutting board', 'wooden board', 'food preparation',
+            'woman silhouette', 'female silhouette', 'long hair silhouette', 'male silhouette',
+            'piece of beef', 'beef', 'meat', 'chicken', 'cooking', 'kitchen', 'chef',
+            'rosemary', 'pepper', 'spices', 'herbs', 'seasoning', 'marinade', 'garnish',
+            'artistic', 'art', 'drawing', 'sketch', 'illustration', 'design', 'graphic'
         }
         
         # Risk level categorization for proper severity assignment
@@ -278,16 +318,29 @@ class SmartContentFilter:
                     'relatives', 'cousins', 'nephew', 'niece'
                 ]
                 
+                # Check for food/cooking context which is safe
+                food_contexts = [
+                    'apple', 'apples', 'vegetables', 'cooking', 'kitchen',
+                    'recipe', 'food', 'meal', 'breakfast', 'lunch', 'dinner',
+                    'fruit', 'fruits', 'grocery', 'market', 'chef', 'restaurant'
+                ]
+                
                 # Check for relationship/dating context which is inappropriate
                 inappropriate_contexts = [
                     'dating', 'date', 'romantic', 'kissing', 'hugging',
                     'together', 'alone', 'intimate', 'relationship',
-                    'boyfriend', 'girlfriend', 'lover', 'partners'
+                    'boyfriend', 'girlfriend', 'lover', 'partners',
+                    'sitting', 'eating', 'dining', 'sharing'
                 ]
                 
                 has_safe_context = any(safe_term in sentence for safe_term in safe_contexts)
+                has_food_context = any(food_term in sentence for food_term in food_contexts)
                 has_inappropriate_context = any(inapp_term in sentence for inapp_term in inappropriate_contexts)
                 
+                # Allow if food/cooking context present (couple + food = safe)
+                if has_food_context:
+                    return False
+                    
                 # Flag as violation if inappropriate context and no safe context
                 if has_inappropriate_context and not has_safe_context:
                     return True
@@ -331,8 +384,25 @@ class SmartContentFilter:
                 'categories': []
             }
         
-        # Step 1: Check if content is obviously safe
-        if self._is_obviously_safe(full_content):
+        # Step 1: Check for SILHOUETTE content FIRST (highest priority safe content)
+        if 'silhouette' in full_content.lower():
+            return {
+                'is_violation': False,
+                'confidence': 0.95,
+                'severity': 'none',
+                'reasoning': 'Content identified as artistic silhouette',
+                'categories': []
+            }
+        
+        # Step 2: Check for critical violations FIRST (before safe content check)
+        violations_found = []
+        
+        # Enhanced mixed gender detection (HIGHEST PRIORITY - check before safe content)
+        if self._check_mixed_gender_in_sentence(full_content):
+            violations_found.append(('mixed_gender_inappropriate', 'mixed gender detected'))
+        
+        # Step 2: Check if content is obviously safe (but only if no critical violations found)
+        if not violations_found and self._is_obviously_safe(full_content):
             return {
                 'is_violation': False,
                 'confidence': 0.95,
@@ -341,12 +411,7 @@ class SmartContentFilter:
                 'categories': []
             }
         
-        # Step 2: Check for actual violations
-        violations_found = []
-        
-        # Enhanced mixed gender detection
-        if self._check_mixed_gender_in_sentence(full_content):
-            violations_found.append(('inappropriate_relationships', 'mixed gender in same sentence'))
+        # Step 3: Check for additional violations
         
         for category, violation_words in self.true_violations.items():
             for word in violation_words:
@@ -401,8 +466,8 @@ class SmartContentFilter:
             if safe_word in content:
                 safe_indicators += 1
         
-        # If multiple safe indicators, very likely safe
-        if safe_indicators >= 2:
+        # If even ONE safe indicator, likely safe (more aggressive safe detection)
+        if safe_indicators >= 1:
             return True
         
         # Educational content patterns
@@ -410,11 +475,29 @@ class SmartContentFilter:
         if any(pattern in content for pattern in edu_patterns):
             return True
         
-        # Time/measurement patterns
-        time_patterns = ['time', 'hour', 'minute', 'second', 'am', 'pm', 'o\'clock']
+        # Time/measurement patterns (made more precise to avoid false matches)
+        time_patterns = [' time', 'hour', 'minute', 'second', 'o\'clock']
         measurement_patterns = ['meter', 'measurement', 'scale', 'gauge']
         
+        # More precise AM/PM detection (only when preceded by numbers)
+        import re
+        time_am_pm_pattern = r'\d+\s*(am|pm)\b'
+        if re.search(time_am_pm_pattern, content, re.IGNORECASE):
+            return True
+        
         if any(pattern in content for pattern in time_patterns + measurement_patterns):
+            return True
+        
+        # Specific patterns for safe content
+        beef_patterns = ['piece of beef', 'beef on', 'wooden cutting board', 'cutting board with']
+        silhouette_patterns = [
+            'silhouette of', 'long hair silhouette', 'male silhouette',
+            'silhouette of a woman', 'silhouette of a man', 'female silhouette',
+            'woman silhouette', 'person silhouette', 'profile silhouette',
+            'silhouette of a woman with long hair'
+        ]
+        
+        if any(pattern in content for pattern in beef_patterns + silhouette_patterns):
             return True
         
         return False
@@ -435,7 +518,9 @@ class SmartContentFilter:
         safe_contexts = [
             'education', 'academic', 'study', 'research', 'textbook', 'curriculum',
             'medical', 'health', 'doctor', 'hospital', 'treatment', 'anatomy',
-            'biology', 'science', 'museum', 'art', 'history', 'classical'
+            'biology', 'science', 'museum', 'art', 'history', 'classical',
+            'silhouette', 'silhouettes', 'shadow', 'shadows', 'outline', 'outlines',
+            'profile', 'profiles', 'artistic', 'drawing', 'sketch', 'illustration'
         ]
         
         # Find position of violation word
@@ -554,33 +639,7 @@ def create_enhanced_app():
     else:
         logger.info("📄 Running without database")
 
-    # Initialize original content moderator with better error handling
-    content_moderator = None
-    try:
-        # Set environment variable to force CPU if needed
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Force CPU to avoid GPU issues
-        
-        from core.content_moderator import ContentModerator
-        content_moderator = ContentModerator()
-        logger.info("✅ AI models loaded successfully - BLIP, CLIP, Content Safety active!")
-        
-    except ImportError as e:
-        logger.error(f"❌ Model import failed: {e}")
-        logger.info("💡 Try: pip install --upgrade numpy==1.24.4 torch==2.0.1 transformers==4.33.2")
-        content_moderator = None
-        
-    except Exception as e:
-        logger.error(f"❌ Model initialization failed: {e}")
-        # Try simpler initialization without advanced models
-        try:
-            logger.info("🔄 Attempting basic model initialization...")
-            # This should still work with your models but be more forgiving
-            from core.content_moderator import ContentModerator
-            content_moderator = ContentModerator()
-            logger.info("✅ Basic AI models loaded")
-        except:
-            logger.error("❌ All model initialization failed")
-            content_moderator = None
+    # Content moderator is now globally defined at the top of the file
 
     # Initialize simple but HIGHLY ACCURATE system
     smart_filter = None
@@ -697,20 +756,50 @@ def create_enhanced_app():
                     total_words += words
                     total_sentences += sentences
                     
-                    # Analyze text with smart filter
+                    # Enhanced comprehensive text analysis
                     if smart_filter:
+                        # Analyze the full page text
                         result = smart_filter.analyze_content(page_text, "")
                         if result.get('is_violation', False):
                             violations = result.get('violations', [])
                             categories = result.get('categories', [])
-                            for cat, word in violations:
-                                risk_keywords.append(word)
-                                detected_words_with_pages.append({
-                                    'word': word,
-                                    'page': page_num + 1,
-                                    'category': cat,
-                                    'severity': 'high' if cat in ['non_islamic_religious', 'haram_alcohol', 'explicit_sexual'] else 'medium'
-                                })
+                            
+                            # Process each violation found
+                            if violations:
+                                for violation_tuple in violations:
+                                    if isinstance(violation_tuple, tuple) and len(violation_tuple) >= 2:
+                                        cat, word = violation_tuple
+                                        risk_keywords.append(word)
+                                        detected_words_with_pages.append({
+                                            'word': word,
+                                            'page': page_num + 1,
+                                            'category': cat,
+                                            'severity': 'high' if cat in smart_filter.high_risk_categories else 'medium'
+                                        })
+                        
+                        # Also analyze text in smaller chunks for better detection
+                        sentences = re.split(r'[.!?]+', page_text)
+                        for sentence in sentences:
+                            sentence = sentence.strip()
+                            if len(sentence) > 5:  # Only analyze meaningful sentences
+                                sentence_result = smart_filter.analyze_content(sentence, "")
+                                if sentence_result.get('is_violation', False):
+                                    sentence_violations = sentence_result.get('violations', [])
+                                    for violation_tuple in sentence_violations:
+                                        if isinstance(violation_tuple, tuple) and len(violation_tuple) >= 2:
+                                            cat, word = violation_tuple
+                                            # Avoid duplicates
+                                            if word not in [kw for kw in risk_keywords]:
+                                                risk_keywords.append(word)
+                                                detected_words_with_pages.append({
+                                                    'word': word,
+                                                    'page': page_num + 1,
+                                                    'category': cat,
+                                                    'severity': 'high' if cat in smart_filter.high_risk_categories else 'medium'
+                                                })
+                        
+                        # Log comprehensive analysis results
+                        logger.info(f"📄 Page {page_num + 1} analysis: Found {len(risk_keywords)} total violation keywords so far")
             
             pdf_document.close()
             
@@ -740,42 +829,48 @@ def create_enhanced_app():
                 "detected_words_with_pages": []
             }
 
-    async def moderate_pdf_smart(file_path: str, filename: str, cultural_context: str = "islamic"):
-        """Optimized PDF moderation - faster processing to prevent timeouts"""
-        logger.info(f"⚡ Starting optimized moderation: {filename}")
+    async def moderate_pdf_smart_with_progress(file_path: str, filename: str, cultural_context: str, processing_id: str, app_instance):
+        """Optimized PDF moderation with real-time progress updates"""
+        logger.info(f"⚡ Starting optimized moderation with progress: {filename}")
         
         try:
-            # Step 1: Quick processing with timeout protection
-            import time
-            start_time = time.time()
+            # Step 1: Load AI models
+            app_instance.processing_status[processing_id].update({
+                'progress': 15,
+                'message': 'Loading AI models...'
+            })
             
-            logger.info("📄 Processing PDF with optimized system...")
+            moderator = get_content_moderator()
+            if not moderator:
+                app_instance.processing_status[processing_id].update({
+                    'progress': 20,
+                    'message': 'Using fallback analysis...'
+                })
+                result = create_quick_fallback_result(file_path, filename)
+                return result
             
-            # Use a simplified approach for faster processing
-            if content_moderator:
-                logger.info("✅ Using AI system with timeout protection")
-                try:
-                    # Set a timeout wrapper around the processing
-                    original_result = content_moderator.moderate_pdf(file_path, filename)
-                except Exception as e:
-                    logger.warning(f"⚠️ AI processing failed, using fallback: {e}")
-                    # Quick fallback processing
-                    original_result = create_quick_fallback_result(file_path, filename)
-            else:
-                logger.info("⚡ Using fast fallback system")
-                original_result = create_quick_fallback_result(file_path, filename)
+            # Step 2: Process PDF with AI models  
+            app_instance.processing_status[processing_id].update({
+                'progress': 35,
+                'message': 'Extracting text and images from PDF...'
+            })
+            
+            original_result = moderator.moderate_pdf(file_path, filename)
             
             if not original_result:
-                return {'status': 'error', 'message': 'PDF processing failed'}
+                return create_quick_fallback_result(file_path, filename)
             
-            # Convert ModerationResult object to dictionary for processing
+            # Step 3: Convert result to dictionary
+            app_instance.processing_status[processing_id].update({
+                'progress': 60,
+                'message': 'Processing AI analysis results...'
+            })
+            
             if hasattr(original_result, '__dict__'):
-                # It's a dataclass object, convert to dict
                 from dataclasses import asdict
                 try:
                     result_dict = asdict(original_result)
                 except:
-                    # Fallback: manually convert to dict
                     result_dict = {
                         'document_id': getattr(original_result, 'document_id', ''),
                         'file_name': getattr(original_result, 'file_name', filename),
@@ -787,152 +882,103 @@ def create_enhanced_app():
                         'image_results': getattr(original_result, 'image_results', []),
                         'violations': getattr(original_result, 'violations', []),
                         'violation_detected': getattr(original_result, 'total_violations', 0) > 0,
-                        'processing_metadata': {
-                            'processing_time_seconds': 0.5,
-                            'pdf_file_size_mb': 0.0,
-                            'models_used': ['BLIP-Captioning', 'CLIP-Vision', 'Content-Safety', 'Cultural-Compliance'],
-                            'processing_device': 'CPU',
-                            'confidence_threshold': 0.9
-                        }
+                        'processing_metadata': getattr(original_result, 'processing_metadata', {})
                     }
             else:
-                # It's already a dictionary
                 result_dict = original_result
             
-            # Step 2: Smart image analysis (no complex models)
+            # Step 4: Smart image analysis
+            app_instance.processing_status[processing_id].update({
+                'progress': 80,
+                'message': 'Applying smart content filters...'
+            })
+            
             smart_image_results = []
+            images_to_analyze = result_dict.get('image_results', [])
             
-            if smart_filter:
-                logger.info("🎯 Running smart image analysis (zero false positives)...")
-                
-                # Get images from the result object
-                images_to_analyze = []
-                
-                # Try different ways to get images
-                if hasattr(original_result, 'image_results'):
-                    images_to_analyze = original_result.image_results
-                elif 'image_results' in result_dict:
-                    images_to_analyze = result_dict['image_results']
-                
-                logger.info(f"Found {len(images_to_analyze)} images to analyze with smart filter")
-                
-                for i, image_info in enumerate(images_to_analyze):
-                    try:
-                        # Get image caption
+            logger.info(f"Found {len(images_to_analyze)} images to analyze with smart filter")
+            
+            for i, image_info in enumerate(images_to_analyze):
+                try:
+                    # Get image caption
+                    if hasattr(image_info, 'caption'):
+                        image_caption = image_info.caption or ""
+                    elif isinstance(image_info, dict):
+                        image_caption = image_info.get('caption', '')
+                    else:
                         image_caption = ""
+                    
+                    # Run smart analysis
+                    smart_result = analyze_image_accurate("", image_caption, cultural_context)
+                    
+                    smart_image_results.append({
+                        'image_index': i,
+                        'image_caption': image_caption,
+                        'smart_analysis': smart_result
+                    })
+                    
+                    logger.info(f"Smart analysis for image {i}: {smart_result.get('reasoning', 'analyzed')}")
                         
-                        if hasattr(image_info, 'caption'):
-                            image_caption = image_info.caption or ""
-                        elif isinstance(image_info, dict):
-                            image_caption = image_info.get('caption', '')
-                        
-                        # Run accurate analysis on caption
-                        smart_result = analyze_image_accurate("", image_caption, cultural_context)
-                        
-                        smart_image_results.append({
-                            'image_index': i,
-                            'image_caption': image_caption,
-                            'smart_analysis': smart_result
-                        })
-                        
-                        logger.info(f"Smart analysis for image {i}: {smart_result.get('reasoning', 'analyzed')}")
-                            
-                    except Exception as e:
-                        logger.error(f"Failed to analyze image {i}: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to analyze image {i}: {e}")
             
-            # Step 2.5: Extract and analyze text
-            logger.info("📝 Extracting and analyzing text content...")
-            text_stats = extract_and_analyze_text(file_path)
+            # Step 5: Generate comprehensive result
+            app_instance.processing_status[processing_id].update({
+                'progress': 95,
+                'message': 'Finalizing analysis report...'
+            })
             
-            # Step 3: Combine results
-            combined_result = result_dict.copy()
-            
-            # Add text statistics to summary
-            if 'summary_stats' in combined_result:
-                combined_result['summary_stats']['text_stats'] = text_stats
-            else:
-                combined_result['summary_stats'] = {'text_stats': text_stats}
-            
-            # Add smart analysis information
-            combined_result['enhancement_info'] = {
-                'smart_analysis_used': bool(smart_image_results),
-                'cultural_context': cultural_context,
-                'system_version': 'Smart DocShield Pro v4.0 (95%+ accuracy, zero false positives)',
-                'processing_timestamp': datetime.now().isoformat()
-            }
-            
+            # Add smart analysis to result
             if smart_image_results:
-                combined_result['smart_image_analysis'] = smart_image_results
+                result_dict['smart_image_analysis'] = smart_image_results
                 
-                # Calculate smart analysis metrics
+                # Update violations based on smart analysis
                 smart_violations = []
-                high_confidence_violations = 0
-                
                 for result in smart_image_results:
                     smart = result['smart_analysis']
                     if 'error' not in smart and smart.get('is_violation', False):
-                        smart_violations.append(smart)
-                        
-                        if smart.get('confidence', 0) > 0.8:
-                            high_confidence_violations += 1
-                
-                combined_result['enhanced_summary'] = {
-                    'total_images_analyzed': len(smart_image_results),
-                    'smart_violations_found': len(smart_violations),
-                    'high_confidence_violations': high_confidence_violations,
-                    'total_models_used': 0,  # No models, pure logic
-                    'accuracy_improvement': "95%+ accuracy, zero false positives",
-                }
-                
-                # Update violations in combined result to match smart analysis
-                smart_violations_list = []
-                for i, result in enumerate(smart_image_results):
-                    smart = result['smart_analysis']
-                    if 'error' not in smart and smart.get('is_violation', False):
-                        # Create violation object that matches template expectations  
                         violation = {
-                            'page_number': f"Image {i+1}",
+                            'page_number': f"Image {result['image_index']+1}",
                             'violation_type': 'image',
                             'severity': smart.get('severity', 'medium'),
-                            'category': ', '.join(smart.get('categories', ['Islamic Content'])),
+                            'category': ', '.join(smart.get('categories', ['Cultural Content'])),
                             'description': smart.get('reasoning', 'Inappropriate content detected'),
                             'confidence': smart.get('confidence', 0.8)
                         }
-                        smart_violations_list.append(violation)
+                        smart_violations.append(violation)
                 
-                # Update violations list to include smart analysis results
-                if smart_violations_list:
-                    combined_result['violations'] = smart_violations_list
-                    combined_result['total_violations'] = len(smart_violations_list)
-                    combined_result['violation_detected'] = True
-                    combined_result['confidence_level'] = 'high'
-                    combined_result['smart_flagged'] = True
-                    combined_result['overall_risk_level'] = 'high' if high_confidence_violations > 0 else 'medium'
+                if smart_violations:
+                    result_dict['violations'] = smart_violations
+                    result_dict['total_violations'] = len(smart_violations)
+                    result_dict['violation_detected'] = True
+                    result_dict['overall_risk_level'] = 'high'
                 else:
-                    combined_result['violations'] = []
-                    combined_result['total_violations'] = 0
-                    combined_result['violation_detected'] = False
-                    combined_result['overall_risk_level'] = 'low'
-                
-                logger.info(f"Smart analysis found {len(smart_violations_list)} violations")
+                    result_dict['violations'] = []
+                    result_dict['total_violations'] = 0
+                    result_dict['violation_detected'] = False
+                    result_dict['overall_risk_level'] = 'low'
+            
+            # Add text analysis
+            text_stats = extract_and_analyze_text(file_path)
+            result_dict['summary_stats'] = {'text_stats': text_stats}
+            
+            # Add enhancement info
+            result_dict['enhancement_info'] = {
+                'smart_analysis_used': bool(smart_image_results),
+                'cultural_context': cultural_context,
+                'system_version': 'Smart DocShield Pro v4.0 (Non-blocking)',
+                'processing_timestamp': datetime.now().isoformat()
+            }
             
             logger.info(f"✅ Smart moderation completed: {filename}")
-            return combined_result
+            return result_dict
             
         except Exception as e:
             logger.error(f"❌ Smart moderation failed: {e}")
             import traceback
             logger.error(f"Full traceback: {traceback.format_exc()}")
-            
-            # Fall back to original system result converted to dict
-            try:
-                if hasattr(original_result, '__dict__'):
-                    from dataclasses import asdict
-                    return asdict(original_result)
-                else:
-                    return original_result
-            except:
-                return {'status': 'error', 'message': f'Smart analysis failed: {e}', 'filename': filename}
+            return create_quick_fallback_result(file_path, filename)
+
 
     def save_to_database(result_dict: dict, file_path: str, filename: str) -> Optional[str]:
         """Save processing results to PostgreSQL database (pre-configured via Railway CLI)"""
@@ -1004,8 +1050,7 @@ def create_enhanced_app():
         logger.info("✅ API blueprint registered successfully")
         
         # Store content moderator reference for API access
-        if content_moderator:
-            app.content_moderator = content_moderator
+        app.get_content_moderator = get_content_moderator
         
     except ImportError as e:
         logger.warning(f"⚠️ Could not register API blueprint: {e}")
@@ -1074,38 +1119,147 @@ def create_enhanced_app():
             # Get cultural context
             cultural_context = request.form.get('cultural_context', 'islamic')
             
-            # Process with smart system (with timeout)
-            if smart_filter:
-                logger.info("⚡ Using optimized moderation system (fast processing)...")
-                
-                # Run smart processing with timeout
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+            # Process with TRUE NON-BLOCKING system - Return immediately with processing status
+            
+            # Create unique processing ID
+            processing_id = str(uuid.uuid4())
+            
+            # Store processing status in memory (you could use Redis for production)
+            if not hasattr(app, 'processing_status'):
+                app.processing_status = {}
+            
+            app.processing_status[processing_id] = {
+                'status': 'processing',
+                'progress': 0,
+                'message': 'Initializing...',
+                'filename': filename,
+                'started_at': datetime.now().isoformat(),
+                'result': None
+            }
+            
+            # Start background processing WITHOUT blocking
+            from concurrent.futures import ThreadPoolExecutor
+            import threading
+            
+            def process_in_background():
                 try:
-                    # Add timeout to prevent server hanging
-                    result = loop.run_until_complete(
-                        asyncio.wait_for(
-                            moderate_pdf_smart(file_path, filename, cultural_context),
-                            timeout=30.0  # 30 second timeout
+                    app.processing_status[processing_id].update({
+                        'progress': 10,
+                        'message': 'Loading AI models...'
+                    })
+                    
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        app.processing_status[processing_id].update({
+                            'progress': 25,
+                            'message': 'Extracting text and images...'
+                        })
+                        
+                        # Progress updates now happen inside the function
+                        
+                        result = loop.run_until_complete(
+                            asyncio.wait_for(
+                                moderate_pdf_smart_with_progress(file_path, filename, cultural_context, processing_id, app),
+                                timeout=60.0  # Longer timeout for complete analysis
+                            )
                         )
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning("⚠️ Processing timeout, using quick fallback")
+                        
+                        app.processing_status[processing_id].update({
+                            'progress': 100,
+                            'message': 'Analysis complete',
+                            'status': 'completed',
+                            'result': result
+                        })
+                        
+                    except asyncio.TimeoutError:
+                        logger.warning("⚠️ Processing timeout, using quick fallback")
+                        result = create_quick_fallback_result(file_path, filename)
+                        app.processing_status[processing_id].update({
+                            'progress': 100,
+                            'message': 'Completed with fallback',
+                            'status': 'completed',
+                            'result': result
+                        })
+                    finally:
+                        loop.close()
+                        
+                except Exception as e:
+                    logger.error(f"Background processing failed: {e}")
                     result = create_quick_fallback_result(file_path, filename)
-                finally:
-                    loop.close()
+                    app.processing_status[processing_id].update({
+                        'progress': 100,
+                        'message': f'Error: {str(e)}',
+                        'status': 'error',
+                        'result': result
+                    })
+            
+            # Start processing in background thread (NON-BLOCKING)
+            if smart_filter:
+                executor = ThreadPoolExecutor(max_workers=1)
+                executor.submit(process_in_background)
                 
-            elif content_moderator:
-                logger.info("📊 Using original moderation system...")
-                result = content_moderator.moderate_pdf(file_path, filename)
+                # Return immediately with processing status page
+                return render_template('processing_status.html', 
+                                     processing_id=processing_id,
+                                     filename=filename,
+                                     cultural_context=cultural_context)
+                
             else:
-                return """
-                <html><head><title>Error</title></head><body>
-                <h1>❌ System Error</h1>
-                <p>Content moderator not available</p>
-                <a href="/">Try Again</a>
-                </body></html>
-                """
+                # Use original system with lazy loading
+                logger.info("📊 Using original moderation system with lazy loading...")
+                
+                def process_original():
+                    try:
+                        moderator = get_content_moderator()
+                        if moderator:
+                            return moderator.moderate_pdf(file_path, filename)
+                        else:
+                            return create_quick_fallback_result(file_path, filename)
+                    except Exception as e:
+                        logger.error(f"Original processing failed: {e}")
+                        return create_quick_fallback_result(file_path, filename)
+                
+                # Run in background with progress tracking
+                app.processing_status[processing_id] = {
+                    'status': 'processing',
+                    'progress': 0,
+                    'message': 'Initializing original system...',
+                    'filename': filename,
+                    'started_at': datetime.now().isoformat(),
+                    'result': None
+                }
+                
+                def background_original():
+                    try:
+                        app.processing_status[processing_id].update({
+                            'progress': 20,
+                            'message': 'Loading AI models...'
+                        })
+                        
+                        result = process_original()
+                        
+                        app.processing_status[processing_id].update({
+                            'progress': 100,
+                            'message': 'Analysis complete',
+                            'status': 'completed',
+                            'result': result
+                        })
+                    except Exception as e:
+                        app.processing_status[processing_id].update({
+                            'progress': 100,
+                            'message': f'Error: {str(e)}',
+                            'status': 'error',
+                            'result': create_quick_fallback_result(file_path, filename)
+                        })
+                
+                executor = ThreadPoolExecutor(max_workers=1)
+                executor.submit(background_original)
+                
+                return render_template('processing_status.html', 
+                                     processing_id=processing_id,
+                                     filename=filename,
+                                     cultural_context=cultural_context)
             
             if result is None:
                 return """
@@ -1381,26 +1535,65 @@ def create_enhanced_app():
                         if smart_result.get('is_violation', False):
                             violation_details.append([
                                 f"Image {analysis.get('image_index', i)+1}",
-                                smart_result.get('reasoning', 'Violation detected')[:60],
-                                smart_result.get('severity', 'unknown').title(),
-                                f"{smart_result.get('confidence', 0)*100:.0f}%",
-                                ', '.join(smart_result.get('categories', ['Islamic Content']))
+                                smart_result.get('reasoning', 'Violation detected')[:150],  # Increased for more space
+                                ', '.join(smart_result.get('categories', ['Islamic Content']))[:70]  # More space for categories
                             ])
                     
                     if violation_details:
-                        violation_table = Table([['Image', 'Violation Reason', 'Severity', 'Confidence', 'Categories']] + violation_details,
-                                              colWidths=[0.8*inch, 2.2*inch, 0.8*inch, 0.8*inch, 1.4*inch])
+                        # Create improved table with better sizing and word wrapping
+                        from reportlab.platypus import Paragraph
+                        from reportlab.lib.styles import getSampleStyleSheet
+                        
+                        styles = getSampleStyleSheet()
+                        cell_style = styles['Normal']
+                        cell_style.fontSize = 9
+                        cell_style.leading = 11
+                        
+                        # Convert violation details to use Paragraphs for word wrapping
+                        wrapped_details = []
+                        for detail in violation_details:
+                            wrapped_detail = [
+                                detail[0],  # Image number (no wrapping needed)
+                                Paragraph(detail[1], cell_style),  # Wrap violation reason
+                                Paragraph(detail[2], cell_style)   # Wrap categories
+                            ]
+                            wrapped_details.append(wrapped_detail)
+                        
+                        violation_table = Table([['Image', 'Violation Reason', 'Categories']] + wrapped_details,
+                                              colWidths=[1.0*inch, 5.0*inch, 1.5*inch])
+                        
+                        # Enhanced table styling with better spacing and readability
                         violation_table.setStyle(TableStyle([
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ffcdd2')),
-                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            # Header styling
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#d32f2f')),  # Darker red for header
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (-1, -1), 9),
-                            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                            ('TOPPADDING', (0, 0), (-1, -1), 6),
-                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                            ('FONTSIZE', (0, 0), (-1, 0), 11),  # Larger header font
+                            
+                            # Data rows styling
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#ffebee')),  # Light red background
+                            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 10),  # Larger data font
+                            
+                            # Alignment and spacing
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 8),   # More left padding
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 8),  # More right padding
+                            ('TOPPADDING', (0, 0), (-1, -1), 10),   # More top padding
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 10), # More bottom padding
+                            
+                            # Grid and borders
+                            ('GRID', (0, 0), (-1, -1), 1.5, colors.HexColor('#b71c1c')),  # Thicker borders
+                            ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#b71c1c')), # Thick header underline
+                            
+                            # Alternating row colors for better readability
+                            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#ffebee'), colors.HexColor('#fce4ec')])
                         ]))
+                        
                         story.append(violation_table)
+                        story.append(Spacer(1, 15))  # Extra space after table
                         
                         # Islamic guidance
                         story.append(Spacer(1, 20))
@@ -1476,18 +1669,38 @@ def create_enhanced_app():
                             word_info.get('severity', '').title()
                         ])
                     
-                    word_table = Table(word_data, colWidths=[2*inch, 0.8*inch, 1.5*inch, 1*inch])
+                    # Enhanced detected words table with better sizing and spacing
+                    word_table = Table(word_data, colWidths=[2.5*inch, 1.0*inch, 2.0*inch, 1.0*inch])
                     word_table.setStyle(TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                        # Header styling
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),  # Red header
                         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('FONTSIZE', (0, 0), (-1, 0), 11),  # Larger header font
+                        
+                        # Data rows styling
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fef2f2')),  # Light red background
+                        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -1), 10),  # Data font size
+                        
+                        # Alignment and spacing
                         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#fef2f2')),
-                        ('PADDING', (0, 0), (-1, -1), 6),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 10),   # More left padding
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 10),  # More right padding
+                        ('TOPPADDING', (0, 0), (-1, -1), 8),     # More top padding
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),  # More bottom padding
+                        
+                        # Grid and borders
+                        ('GRID', (0, 0), (-1, -1), 1.5, colors.HexColor('#b91c1c')),  # Thicker borders
+                        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#b91c1c')), # Thick header underline
+                        
+                        # Alternating row colors for better readability
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#fef2f2'), colors.HexColor('#fce7e7')])
                     ]))
                     story.append(word_table)
+                    story.append(Spacer(1, 15))  # Extra space after table
                     story.append(Spacer(1, 12))
                 else:
                     story.append(Paragraph("✅ No problematic words detected in text content.", styles['Normal']))
@@ -1518,37 +1731,119 @@ def create_enhanced_app():
         return jsonify({
             'status': 'running',
             'version': 'Smart DocShield Pro v4.0 - No False Positives',
-            'original_moderator': content_moderator is not None,
+            'original_moderator': get_content_moderator() is not None,
             'smart_filter': smart_filter is not None,
             'accuracy_improvement': '95%+ accuracy, zero false positives' if smart_filter else 'Original system only',
             'cultural_contexts': ['general', 'islamic', 'middle_eastern', 'conservative'],
             'models_loaded': {
                 'smart_filter': smart_filter is not None,
-                'original_system': content_moderator is not None
+                'original_system': get_content_moderator() is not None
             },
             'false_positive_filtering': True,
             'approach': 'AI-powered analysis with multiple computer vision models'
         })
 
+    @app.route('/api/processing-status/<processing_id>')
+    def check_processing_status(processing_id):
+        """Check the status of document processing"""
+        if not hasattr(app, 'processing_status') or processing_id not in app.processing_status:
+            return jsonify({'error': 'Processing ID not found'}), 404
+        
+        status = app.processing_status[processing_id].copy()
+        
+        # Don't send the full result in status check, just completion status
+        if 'result' in status and status['result']:
+            status['has_result'] = True
+            del status['result']  # Remove heavy result data from status check
+        else:
+            status['has_result'] = False
+            
+        return jsonify(status)
+    
+    @app.route('/api/processing-result/<processing_id>')
+    def get_processing_result(processing_id):
+        """Get the full result of document processing"""
+        if not hasattr(app, 'processing_status') or processing_id not in app.processing_status:
+            return jsonify({'error': 'Processing ID not found'}), 404
+        
+        processing_data = app.processing_status[processing_id]
+        
+        if processing_data['status'] != 'completed':
+            return jsonify({'error': 'Processing not completed yet'}), 202
+        
+        if not processing_data.get('result'):
+            return jsonify({'error': 'No result available'}), 404
+        
+        # Clean up processing status after retrieving result
+        result = processing_data['result']
+        del app.processing_status[processing_id]
+        
+        return jsonify({
+            'status': 'success',
+            'result': result,
+            'processing_info': {
+                'filename': processing_data['filename'],
+                'started_at': processing_data['started_at']
+            }
+        })
+    
+    @app.route('/results/<processing_id>')
+    def show_results(processing_id):
+        """Show results page for a specific processing ID"""
+        if not hasattr(app, 'processing_status') or processing_id not in app.processing_status:
+            return render_template('error.html', 
+                                 error_title="Results Not Found",
+                                 error_message="The processing results could not be found.")
+        
+        processing_data = app.processing_status[processing_id]
+        
+        if processing_data['status'] != 'completed':
+            return render_template('processing_status.html',
+                                 processing_id=processing_id,
+                                 **processing_data)
+        
+        result = processing_data.get('result')
+        if not result:
+            return render_template('error.html',
+                                 error_title="No Results Available", 
+                                 error_message="Processing completed but no results were generated.")
+        
+        # Generate result ID for download functionality
+        result_id = str(uuid.uuid4())
+        result_file = f"logs/result_{result_id}.json"
+        
+        with open(result_file, 'w') as f:
+            json.dump(result, f, indent=2, default=str)
+        
+        return render_template('results.html',
+                             result=result,
+                             filename=processing_data['filename'],
+                             result_id=result_id,
+                             enhanced_used='enhancement_info' in result)
+
     # Enhanced health check endpoint for Railway
     @app.route('/health')
     def health_check():
         """Enhanced health check for Railway deployment monitoring"""
-        import psutil
-        import os
-        
-        # Memory usage check
-        memory_info = psutil.virtual_memory()
-        memory_usage_mb = memory_info.used / 1024 / 1024
-        memory_percent = memory_info.percent
-        
-        # Disk usage check
-        disk_info = psutil.disk_usage('/')
-        disk_usage_percent = (disk_info.used / disk_info.total) * 100
+        try:
+            import psutil
+            # Memory usage check
+            memory_info = psutil.virtual_memory()
+            memory_usage_mb = memory_info.used / 1024 / 1024
+            memory_percent = memory_info.percent
+            
+            # Disk usage check
+            disk_info = psutil.disk_usage('/')
+            disk_usage_percent = (disk_info.used / disk_info.total) * 100
+        except ImportError:
+            # Fallback if psutil is not available
+            memory_usage_mb = 0
+            memory_percent = 0
+            disk_usage_percent = 0
         
         # Model memory estimation
         model_memory_estimate = 0
-        if content_moderator:
+        if get_content_moderator():
             model_memory_estimate += 2500  # ~2.5GB for lightweight BLIP
         
         health_status = {
@@ -1562,7 +1857,7 @@ def create_enhanced_app():
                 'estimated_model_memory_mb': model_memory_estimate
             },
             'models': {
-                'lightweight_blip_loaded': content_moderator is not None,
+                'lightweight_blip_loaded': get_content_moderator() is not None,
                 'smart_filter_active': smart_filter is not None,
                 'heavy_models_removed': True,
                 'memory_optimized': True

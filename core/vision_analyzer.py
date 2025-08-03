@@ -66,8 +66,8 @@ class NSFWDetector:
         self.device = model_config.device
         self.model = None
         self.processor = None
-        # Balanced threshold for optimal accuracy
-        self.threshold = 0.35  # Optimized threshold for balanced detection
+        # Much more conservative threshold to eliminate false positives
+        self.threshold = 0.65  # Much higher threshold to eliminate false positives for food/silhouettes
         self._load_model()
     
     def _load_model(self):
@@ -126,10 +126,10 @@ class NSFWDetector:
             # Ensemble voting - combine multiple approaches
             ensemble_score = (primary_score * 0.7) + (secondary_score * 0.3)
             
-            # Optimized categorization thresholds
-            if ensemble_score > 0.5:
+            # Much more conservative categorization thresholds to eliminate false positives
+            if ensemble_score > 0.80:  # Much higher threshold for NSFW
                 category = "nsfw"
-            elif ensemble_score > 0.25:
+            elif ensemble_score > 0.60:  # Much higher threshold for questionable
                 category = "questionable" 
             else:
                 category = "safe"
@@ -879,12 +879,12 @@ class VisionAnalyzer:
         """Calculate overall risk level and confidence"""
         risk_scores = []
         
-        # NSFW risk - Optimized thresholds for balanced accuracy
-        if nsfw_score > 0.5:  # High risk threshold - be confident
+        # NSFW risk - More conservative thresholds to reduce false positives
+        if nsfw_score > 0.65:  # Higher threshold for high risk - be more confident
             risk_scores.append(("high", nsfw_score))
-        elif nsfw_score > 0.25:  # Medium risk threshold - cautious detection
+        elif nsfw_score > 0.35:  # Higher threshold for medium risk
             risk_scores.append(("medium", nsfw_score))
-        elif nsfw_score > 0.12:  # Low threshold for early detection
+        elif nsfw_score > 0.20:  # Higher threshold for low risk detection
             risk_scores.append(("low", nsfw_score))
         
         # Content category risks - Enhanced with specific alcohol detection and exclusions
@@ -911,35 +911,68 @@ class VisionAnalyzer:
         
         # Check excluded categories first - if found, reduce their impact
         for category in excluded_categories:
-            if category in similarities and similarities[category] > 0.12:  # Lower threshold for safer exclusion
+            if category in similarities and similarities[category] > 0.03:  # Much lower threshold for safer exclusion
                 # This is likely a logo or food item, significantly reduce risk
                 logger.info(f"🟡 Detected safe content: {category} with score {similarities[category]:.3f} - EXCLUDING from violations")
-                return "low", 0.03  # Force very low risk for excluded content
+                return "low", 0.01  # Force very low risk for excluded content
         
-        # Additional yellow/golden logo specific check
+        # Enhanced safe content detection with additional checks
         caption_lower = caption.lower() if caption else ""
+        
+        # Yellow/golden logo specific check
         if any(term in caption_lower for term in ["yellow", "golden", "gold", "amber"]) and \
            any(term in caption_lower for term in ["logo", "brand", "emblem", "symbol", "sign"]):
             logger.info(f"🟡 Yellow/golden logo detected in caption - EXCLUDING from violations")
-            return "low", 0.1
+            return "low", 0.02
+        
+        # Silhouette detection - silhouettes are artistic and acceptable
+        if any(term in caption_lower for term in ["silhouette", "silhouettes", "shadow", "shadows", "outline", "outlines", "profile", "profiles", "dark figure", "dark figures", "shape", "shapes"]):
+            logger.info(f"🎨 Silhouette/artistic content detected - EXCLUDING from violations")
+            return "low", 0.01
+        
+        # Food detection - food images are culturally acceptable
+        food_terms = ["food", "meal", "dish", "cooking", "kitchen", "chef", "recipe", "ingredient", 
+                     "beef", "meat", "chicken", "fish", "salmon", "seafood", "vegetables", "fruit", "bread",
+                     "cutting board", "wooden board", "chopping board", "plate", "bowl", "serving",
+                     "piece of beef", "piece of meat", "raw meat", "cooked meat", "grilled", "roasted",
+                     "rosemary", "pepper", "spices", "herbs", "seasoning", "marinade", "garnish"]
+        if any(term in caption_lower for term in food_terms):
+            logger.info(f"🍽️ Food content detected - EXCLUDING from violations")
+            return "low", 0.01
+        
+        # Professional/business context detection
+        professional_terms = ["office", "business", "meeting", "professional", "corporate", "workplace",
+                             "conference", "presentation", "desk", "computer", "laptop", "documents"]
+        if any(term in caption_lower for term in professional_terms):
+            logger.info(f"💼 Professional/business content detected - REDUCING risk")
+            # Don't completely exclude but significantly reduce risk
+            nsfw_score = max(0.02, nsfw_score * 0.3)  # Reduce NSFW score by 70%
+        
+        # Single person detection - individual portraits are generally acceptable
+        if ("woman" in caption_lower or "man" in caption_lower) and \
+           not any(term in caption_lower for term in ["and", "with", "together", "couple", "group"]):
+            # Check if it's clearly a single person professional context
+            if any(term in caption_lower for term in ["standing", "sitting", "portrait", "headshot", "professional"]):
+                logger.info(f"👤 Single person professional portrait detected - REDUCING risk")
+                nsfw_score = max(0.02, nsfw_score * 0.4)  # Reduce NSFW score by 60%
         
         for category in high_risk_categories:
-            # Optimized thresholds for better accuracy
+            # More conservative thresholds to reduce false positives
             if "revealing" in category or "clothing" in category or "swimwear" in category or "underwear" in category:
-                threshold = 0.25  # Optimized threshold for clothing issues
+                threshold = 0.40  # Higher threshold for clothing issues
             elif "couple" in category or "romantic" in category or "kissing" in category or "dating" in category:
-                threshold = 0.28  # Optimized threshold for relationship content
+                threshold = 0.45  # Higher threshold for relationship content
             elif "wine glass" in category or "alcohol" in category:
-                threshold = 0.35   # Moderate threshold for alcohol detection
+                threshold = 0.50   # Higher threshold for alcohol detection
             else:
-                threshold = 0.27   # Optimized standard threshold
+                threshold = 0.35   # Higher standard threshold
             
             if category in similarities and similarities[category] > threshold:
                 risk_scores.append(("high", similarities[category]))
         
         for category in medium_risk_categories:
-            # Optimized thresholds for medium risk categories
-            threshold = 0.22 if "religious" in category or "church" in category or "mosque" in category else 0.26
+            # More conservative thresholds for medium risk categories
+            threshold = 0.30 if "religious" in category or "church" in category or "mosque" in category else 0.35
             if category in similarities and similarities[category] > threshold:
                 risk_scores.append(("medium", similarities[category]))
         
@@ -1030,13 +1063,17 @@ class VisionAnalyzer:
             "salmon", "fish", "seafood", "food", "meal", "dish", "cuisine", "cooking",
             "restaurant food", "dinner", "lunch", "breakfast", "plate", "serving",
             "chef", "kitchen", "recipe", "ingredients", "menu", "text", "sign",
-            "graphic design", "design element", "icon"
+            "graphic design", "design element", "icon", "silhouette", "shadow", "outline",
+            "profile", "dark figure", "artistic", "art", "drawing", "sketch", "illustration",
+            "beef", "meat", "chicken", "vegetables", "fruit", "bread", "cutting board",
+            "wooden board", "chopping board", "bowl", "serving dish", "table setting",
+            "culinary", "gastronomy", "dining", "nutrition", "healthy eating"
         ]
         
         # If any excluded terms are found, return low risk immediately
         for term in excluded_terms:
             if term in caption_lower:
-                return "low", 0.1
+                return "low", 0.05  # Even lower risk for excluded content
         
         # Enhanced detection for man and woman TOGETHER - HIGH RISK only if BOTH present
         # Single gender is acceptable (man only, woman only, boy only, girl only)

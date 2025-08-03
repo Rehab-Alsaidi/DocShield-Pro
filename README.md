@@ -123,21 +123,7 @@ DocShield Pro is a sophisticated AI-powered PDF content moderation system design
 | Cultural Engine | <10 MB | ~50 MB | Rule-based filtering |
 | **Total** | **~1 GB** | **~2.5 GB** | **Complete system** |
 
-## 🔧 Configuration
 
-### Environment Variables
-```bash
-# Application
-PORT=8080
-HOST=0.0.0.0
-DEBUG=false
-
-# Database (Optional)
-DATABASE_URL=postgresql://user:pass@host:port/db
-
-# Model Configuration
-CUDA_VISIBLE_DEVICES=""  # Force CPU-only
-```
 
 ### Cultural Context Settings
 The system supports multiple cultural contexts:

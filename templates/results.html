@@ -521,49 +521,13 @@
                 </div>
                 
                 <!-- Additional Options -->
-                <div class="mt-6 flex justify-center space-x-4">
+                <div class="mt-6 flex justify-center">
                     <button onclick="exportToCSV()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                         <i class="fas fa-file-csv mr-1"></i>Export to CSV
-                    </button>
-                    <button onclick="viewTechnicalDetails()" class="text-sm text-gray-600 hover:text-gray-800 font-medium">
-                        <i class="fas fa-info-circle mr-1"></i>Technical Details
                     </button>
                 </div>
             </div>
 
-            <!-- Technical Details (Hidden by default) -->
-            <div id="technicalDetails" class="hidden mt-8 bg-gray-50 rounded-lg border border-gray-200 p-6">
-                <h3 class="text-lg font-bold text-gray-900 mb-4">Technical Analysis Details</h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h4 class="font-semibold text-gray-900 mb-2">Processing Information</h4>
-                        <div class="space-y-1 text-sm">
-                            <p><span class="text-gray-600">Result ID:</span> {{ result_id }}</p>
-                            <p><span class="text-gray-600">Document ID:</span> {{ result.document_id or result.file_id or 'N/A' }}</p>
-                            <p><span class="text-gray-600">Processing Device:</span> {{ result.processing_metadata.processing_device if result.processing_metadata else 'CPU' }}</p>
-                            <p><span class="text-gray-600">Confidence Threshold:</span> {{ result.processing_metadata.confidence_threshold if result.processing_metadata else '0.9' }}</p>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h4 class="font-semibold text-gray-900 mb-2">Analysis Statistics</h4>
-                        <div class="space-y-1 text-sm">
-                            <p><span class="text-gray-600">Images Processed:</span> {{ result.image_results|length if result.image_results else 0 }}</p>
-                            <p><span class="text-gray-600">Text Blocks:</span> {{ result.text_results|length if result.text_results else 0 }}</p>
-                            <p><span class="text-gray-600">Vision Results:</span> {{ result.vision_results|length if result.vision_results else 0 }}</p>
-                            <p><span class="text-gray-600">Total Violations:</span> {{ result.violations|length if result.violations else 0 }}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                {% if result.summary_stats %}
-                <div class="mt-4">
-                    <h4 class="font-semibold text-gray-900 mb-2">Summary Statistics</h4>
-                    <pre class="text-xs bg-white p-3 rounded border overflow-x-auto">{{ result.summary_stats | tojson(indent=2) }}</pre>
-                </div>
-                {% endif %}
-            </div>
         </div>
     </div>
 </div>
@@ -621,15 +585,6 @@ function exportToCSV() {
     {% endif %}
 }
 
-function viewTechnicalDetails() {
-    const details = document.getElementById('technicalDetails');
-    if (details.classList.contains('hidden')) {
-        details.classList.remove('hidden');
-        details.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        details.classList.add('hidden');
-    }
-}
 
 function showNotification(message, type) {
     const notification = document.createElement('div');

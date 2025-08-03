@@ -278,7 +278,7 @@ processing_manager = ProcessingManager()
 @enhanced_bp.route('/enhanced_upload')
 def enhanced_upload():
     """Enhanced upload page for large files"""
-    return render_template('enhanced_upload.html')
+    return render_template('upload_new.html')
 
 @enhanced_bp.route('/process_large_file', methods=['POST'])
 def process_large_file():
@@ -415,7 +415,7 @@ def results_preview(task_id):
     
     result = status['result']
     
-    return render_template('results_preview.html', 
+    return render_template('results.html', 
                          result=result,
                          task_id=task_id,
                          reports=status.get('reports', {}))

@@ -23,12 +23,12 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual Environment
 venv/
 env/
 ENV/
 .venv/
-.env/
+.env
 
 # IDE
 .vscode/
@@ -46,46 +46,47 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Application specific
+# Project Specific
 static/uploads/*
-!static/uploads/.gitkeep
-logs/*.log
+static/results/*
+static/reports/*
 logs/*.json
-!logs/.gitkeep
-*.sqlite
-*.db
+logs/*.pdf
+logs/*.log
+results/*
+reports/*
+temp/*
 
-# Model cache
-.cache/
-models/
-transformers_cache/
-
-# Temporary files
-*.tmp
-*.temp
-test_*.py
-temp_*
+# Keep directory structure but ignore contents
+\!static/uploads/.gitkeep
+\!static/results/.gitkeep
+\!static/reports/.gitkeep
+\!logs/.gitkeep
+\!results/.gitkeep
+\!reports/.gitkeep
 
 # Environment variables
 .env
 .env.local
 .env.production
+.env.staging
 
 # Database
-*.sqlite3
 *.db
-init_railway_db.py
-setup_railway_db.py
-deploy_railway.py
-migrate_database.py
+*.sqlite
+*.sqlite3
 
-# Reports
-reports/*.pdf
-
-# Secrets
-config/secrets.yaml
-config/production.yaml
-.env*
-
-# Railway specific
+# Railway deployment
 .railway/
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+docs/_build/
+EOF < /dev/null
